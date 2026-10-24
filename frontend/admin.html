@@ -39,6 +39,7 @@
         <button class="nav-tab-btn" data-tab="tabPoll">3. LIVE POLL CONTROLS</button>
         <button class="nav-tab-btn" data-tab="tabResults">4. ROUND 1 RESULTS &amp; AVERAGES</button>
         <button class="nav-tab-btn" data-tab="tabFinalize">5. FINALIZE RESULTS</button>
+        <button class="nav-tab-btn wom-tab-btn" data-tab="tabMisfortune">☠️ WHEEL OF MISFORTUNE</button>
     </nav>
 
     <!-- Global Admin Banner -->
@@ -379,6 +380,95 @@
         </div>
     </section>
 
+    <!-- ==========================================
+         TAB 6: WHEEL OF MISFORTUNE
+         ========================================== -->
+    <section id="tabMisfortune" class="tab-content">
+
+        <!-- Header Banner -->
+        <div class="wom-header-banner">
+            <div class="wom-skull-row">
+                <span class="wom-skull">💀</span>
+                <div>
+                    <h2 class="wom-title">WHEEL OF MISFORTUNE</h2>
+                    <div class="wom-subtitle">FATE DECIDES. NO MERCY. NO ESCAPE.</div>
+                </div>
+                <span class="wom-skull">💀</span>
+            </div>
+        </div>
+
+        <div class="admin-grid-2col">
+
+            <!-- Left: Wheel Canvas -->
+            <div class="admin-card wom-wheel-card">
+                <div class="wom-canvas-wrapper">
+                    <canvas id="womCanvas"></canvas>
+                </div>
+                <button id="btnSpinMisfortune" class="btn-wom-spin">
+                    <span>&#128128; SPIN THE WHEEL OF MISFORTUNE</span>
+                </button>
+            </div>
+
+            <!-- Right: Item Manager -->
+            <div style="display: flex; flex-direction: column; gap: 18px;">
+
+                <!-- Add Item -->
+                <div class="admin-card wom-items-card">
+                    <div class="admin-card-header" style="border-color: rgba(139,0,0,0.4);">
+                        <h2 class="admin-card-title" style="color: #ff4444;">&#9760;&#65039; FATES LIST</h2>
+                        <span id="womItemCount" style="font-family: var(--font-pixel); font-size: 10px; color: #8B0000;">0 ITEMS</span>
+                    </div>
+
+                    <!-- Add input -->
+                    <div class="wom-add-row">
+                        <input
+                            type="text"
+                            id="womItemInput"
+                            class="wom-item-input"
+                            placeholder="Enter a fate..."
+                            maxlength="40"
+                            autocomplete="off"
+                        >
+                        <button id="btnWomAdd" class="btn-wom-add">+ ADD</button>
+                    </div>
+
+                    <!-- Quick presets -->
+                    <div style="margin: 10px 0 6px 0;">
+                        <div style="font-family: var(--font-pixel); font-size: 8px; color: #8B0000; margin-bottom: 6px;">QUICK LOAD PRESETS:</div>
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                            <button class="btn-wom-preset" onclick="loadWomPreset('punishments')">Punishments</button>
+                            <button class="btn-wom-preset" onclick="loadWomPreset('truths')">Truth or Dare</button>
+                            <button class="btn-wom-preset" onclick="loadWomPreset('tasks')">Crazy Tasks</button>
+                        </div>
+                    </div>
+
+                    <!-- Items list -->
+                    <div id="womItemsList" class="wom-items-list"></div>
+
+                    <!-- Controls -->
+                    <div style="display: flex; gap: 8px; margin-top: 10px;">
+                        <button id="btnWomClear" class="btn-arcade-danger" style="flex: 1; padding: 8px; font-size: 9px;">&#128465;&#65039; CLEAR ALL</button>
+                        <button id="btnWomShuffle" class="btn-arcade-secondary" style="flex: 1; padding: 8px; font-size: 9px;">&#128256; SHUFFLE</button>
+                    </div>
+                </div>
+
+                <!-- Last Result -->
+                <div class="admin-card wom-result-card" id="womResultCard" style="display: none;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 36px; margin-bottom: 6px;">&#128128;</div>
+                        <div style="font-family: var(--font-pixel); font-size: 9px; color: #8B0000; margin-bottom: 8px; letter-spacing: 2px;">FATE HAS DECIDED:</div>
+                        <div id="womResultText" class="wom-result-text">???</div>
+                        <div style="margin-top: 14px; display: flex; gap: 8px; justify-content: center;">
+                            <button id="btnWomRemoveWinner" class="btn-arcade-danger" style="font-size: 9px; padding: 8px 12px;">&#128465;&#65039; REMOVE THIS FATE</button>
+                            <button id="btnWomSpinAgain" class="btn-arcade-secondary" style="font-size: 9px; padding: 8px 12px;">&#128256; SPIN AGAIN</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
 </div>
 
 <!-- Admin Login Passkey Modal -->
@@ -452,9 +542,27 @@
     </div>
 </div>
 
+<!-- Wheel of Misfortune Winner Modal -->
+<div id="womWinnerModal" class="modal-overlay">
+    <div class="wom-winner-modal-card">
+        <div class="wom-winner-bg-effect"></div>
+        <div style="position: relative; z-index: 1;">
+            <div class="wom-winner-skull">&#128128;</div>
+            <div class="wom-winner-label">THE MISFORTUNE GODS HAVE SPOKEN!</div>
+            <div id="womWinnerText" class="wom-winner-text">???</div>
+            <div class="wom-winner-sub">YOUR FATE HAS BEEN SEALED. THERE IS NO ESCAPE.</div>
+            <div style="display: flex; gap: 12px; justify-content: center; margin-top: 18px; flex-wrap: wrap;">
+                <button id="btnWomAcceptFate" class="btn-wom-accept">&#128128; ACCEPT YOUR FATE</button>
+                <button id="btnWomDismissModal" class="btn-arcade-secondary" style="font-size: 10px; padding: 10px 14px;">DISMISS</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="js/config.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/wheel.js"></script>
+<script src="js/wheel_of_misfortune.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="js/admin.js"></script>
 </body>

@@ -1174,3 +1174,259 @@ function exportFinalResultsToExcel() {
     }
 }
 
+// ==========================================
+// WHEEL OF MISFORTUNE — Standalone Spin Wheel
+// ==========================================
+
+const WOM_PRESETS = {
+    punishments: [
+        'Do 20 pushups NOW', 'Wear a funny hat all day', 'Speak in rhymes for 5 min',
+        'Give someone a piggyback ride', 'No phone for 30 min', 'Act like a chicken',
+        'Sing your next sentence', 'Do your best robot dance', 'Eat something spicy',
+        'Text your crush right now', 'Hold a plank for 1 min', 'Talk in slow motion',
+        'Swap seats with someone', 'Do 10 jumping jacks', 'Make animal sounds',
+    ],
+    truths: [
+        'Biggest secret revealed!', 'Who do you have a crush on?', 'Most embarrassing moment',
+        'Worst grade you ever got', 'Last lie you told', 'Craziest dream you had',
+        'Something you never told your parents', 'Favorite person in the room?',
+        "Weirdest thing you've Googled", 'Most awkward date story',
+        'What are you most afraid of?', 'Best prank you pulled',
+        'Celebrity you have a crush on', 'Stupidest thing you believed as a kid',
+        'Most used emoji and why?',
+    ],
+    tasks: [
+        'Freestyle rap for 30 sec', 'Mime an animal until guessed', 'Do an impression',
+        'Draw a portrait in 60 sec', 'Say tongue twister 3 times fast', 'Hum a song till guessed',
+        'Recreate a famous movie scene', 'Do a magic trick', 'Teach a word in another language',
+        'Make up a jingle on the spot', 'Do a news anchor impression', 'Read a text in dramatic voice',
+        'Describe a color without naming it', 'Act out your day without words', 'Tell a joke in 10 sec',
+    ]
+};
+
+let womWheel = null;
+let womItems = JSON.parse(localStorage.getItem('wom_items') || '[]');
+let womLastWinner = null;
+
+const WOM_COLORS = [
+    '#8B0000', '#4B0082', '#B22222', '#800080',
+    '#CC2200', '#6600AA', '#FF4500', '#7B0D1E',
+    '#9B1B30', '#551A8B', '#D2042D', '#3D0066',
+];
+
+function initWOM() {
+    if (typeof WheelOfMisfortune === 'undefined') {
+        setTimeout(initWOM, 100);
+        return;
+    }
+    womWheel = new WheelOfMisfortune('womCanvas', onWOMWinnerSelected);
+    womWheel.setItems(womItems);
+    renderWOMItems();
+    updateWOMCount();
+    bindWOMEvents();
+}
+
+function bindWOMEvents() {
+    const btnSpin = document.getElementById('btnSpinMisfortune');
+    const btnAdd = document.getElementById('btnWomAdd');
+    const inputEl = document.getElementById('womItemInput');
+    const btnClear = document.getElementById('btnWomClear');
+    const btnShuffle = document.getElementById('btnWomShuffle');
+    const btnRemoveWinner = document.getElementById('btnWomRemoveWinner');
+    const btnSpinAgain = document.getElementById('btnWomSpinAgain');
+    const btnAcceptFate = document.getElementById('btnWomAcceptFate');
+    const btnDismiss = document.getElementById('btnWomDismissModal');
+
+    if (btnSpin) btnSpin.addEventListener('click', () => {
+        if (!womWheel || womItems.length < 2) {
+            showNotice('Add at least 2 items to spin the Wheel of Misfortune!', true);
+            return;
+        }
+        womWheel.spin();
+        if (window.arcadeSound) window.arcadeSound.click();
+    });
+
+    if (btnAdd) btnAdd.addEventListener('click', addWOMItem);
+    if (inputEl) {
+        inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); addWOMItem(); }
+        });
+    }
+
+    if (btnClear) btnClear.addEventListener('click', () => {
+        if (womItems.length === 0) return;
+        if (!confirm('Clear all fates from the Wheel of Misfortune?')) return;
+        womItems = [];
+        saveWOMItems();
+        renderWOMItems();
+        updateWOMCount();
+        if (womWheel) womWheel.setItems(womItems);
+        const rc = document.getElementById('womResultCard');
+        if (rc) rc.style.display = 'none';
+        womLastWinner = null;
+        showNotice('Wheel of Misfortune cleared.');
+    });
+
+    if (btnShuffle) btnShuffle.addEventListener('click', () => {
+        for (let i = womItems.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [womItems[i], womItems[j]] = [womItems[j], womItems[i]];
+        }
+        saveWOMItems();
+        renderWOMItems();
+        if (womWheel) womWheel.setItems(womItems);
+        showNotice('Fates shuffled!');
+        if (window.arcadeSound) window.arcadeSound.click();
+    });
+
+    if (btnRemoveWinner) btnRemoveWinner.addEventListener('click', () => {
+        if (womLastWinner === null) return;
+        womItems.splice(womLastWinner, 1);
+        saveWOMItems();
+        renderWOMItems();
+        updateWOMCount();
+        if (womWheel) womWheel.setItems(womItems);
+        womLastWinner = null;
+        const rc = document.getElementById('womResultCard');
+        if (rc) rc.style.display = 'none';
+        showNotice('Fate removed from the wheel.');
+    });
+
+    if (btnSpinAgain) btnSpinAgain.addEventListener('click', () => {
+        if (!womWheel || womItems.length < 2) {
+            showNotice('Need at least 2 items!', true);
+            return;
+        }
+        womWheel.spin();
+        if (window.arcadeSound) window.arcadeSound.click();
+    });
+
+    if (btnAcceptFate) btnAcceptFate.addEventListener('click', () => {
+        const modal = document.getElementById('womWinnerModal');
+        if (modal) modal.style.display = 'none';
+    });
+
+    if (btnDismiss) btnDismiss.addEventListener('click', () => {
+        const modal = document.getElementById('womWinnerModal');
+        if (modal) modal.style.display = 'none';
+    });
+
+    const womModal = document.getElementById('womWinnerModal');
+    if (womModal) {
+        womModal.addEventListener('click', (e) => {
+            if (e.target === womModal) womModal.style.display = 'none';
+        });
+    }
+
+    // Resize wheel when its tab is activated
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.nav-tab-btn');
+        if (btn && btn.dataset.tab === 'tabMisfortune' && womWheel) {
+            setTimeout(() => womWheel.resize(), 60);
+        }
+    });
+}
+
+function addWOMItem() {
+    const inputEl = document.getElementById('womItemInput');
+    if (!inputEl) return;
+    const val = inputEl.value.trim();
+    if (!val) return;
+    if (womItems.length >= 20) {
+        showNotice('Maximum 20 fates on the wheel at once!', true);
+        return;
+    }
+    if (womItems.includes(val)) {
+        showNotice('This fate is already on the wheel!', true);
+        return;
+    }
+    womItems.push(val);
+    inputEl.value = '';
+    inputEl.focus();
+    saveWOMItems();
+    renderWOMItems();
+    updateWOMCount();
+    if (womWheel) womWheel.setItems(womItems);
+    if (window.arcadeSound) window.arcadeSound.click();
+}
+
+function removeWOMItem(index) {
+    womItems.splice(index, 1);
+    if (womLastWinner !== null && womLastWinner >= index) womLastWinner = null;
+    saveWOMItems();
+    renderWOMItems();
+    updateWOMCount();
+    if (womWheel) womWheel.setItems(womItems);
+    if (window.arcadeSound) window.arcadeSound.click();
+}
+window.removeWOMItem = removeWOMItem;
+
+function renderWOMItems() {
+    const list = document.getElementById('womItemsList');
+    if (!list) return;
+    if (womItems.length === 0) {
+        list.innerHTML = `
+            <div style="text-align: center; color: #5a2020; padding: 20px; font-size: 9px; font-family: var(--font-pixel); line-height: 2;">
+                \u{1F480} NO FATES LOADED<br><span style="font-size: 8px; color: #3d0000;">ADD ITEMS OR USE A PRESET</span>
+            </div>`;
+        return;
+    }
+    list.innerHTML = womItems.map((item, i) => {
+        const color = WOM_COLORS[i % WOM_COLORS.length];
+        return `
+            <div class="wom-item-row">
+                <div class="wom-item-color-dot" style="background: ${color}; box-shadow: 0 0 6px ${color};"></div>
+                <span class="wom-item-label" title="${escapeHtml(item)}">${escapeHtml(item)}</span>
+                <button class="btn-wom-remove-item" onclick="removeWOMItem(${i})" title="Remove">\u2715</button>
+            </div>`;
+    }).join('');
+}
+
+function updateWOMCount() {
+    const el = document.getElementById('womItemCount');
+    if (el) el.textContent = womItems.length + ' ITEM' + (womItems.length !== 1 ? 'S' : '');
+}
+
+function saveWOMItems() {
+    localStorage.setItem('wom_items', JSON.stringify(womItems));
+}
+
+function onWOMWinnerSelected(winner, segmentIndex) {
+    if (winner === undefined || winner === null) return;
+    womLastWinner = segmentIndex;
+
+    const rc = document.getElementById('womResultCard');
+    const rt = document.getElementById('womResultText');
+    if (rc) rc.style.display = 'block';
+    if (rt) rt.textContent = winner;
+
+    const modal = document.getElementById('womWinnerModal');
+    const modalText = document.getElementById('womWinnerText');
+    if (modal && modalText) {
+        modalText.textContent = winner;
+        modal.style.display = 'flex';
+    }
+}
+
+window.loadWomPreset = function(presetKey) {
+    const preset = WOM_PRESETS[presetKey];
+    if (!preset) return;
+    if (womItems.length > 0 && !confirm('Replace current fates with "' + presetKey + '" preset?')) return;
+    womItems = [...preset];
+    saveWOMItems();
+    renderWOMItems();
+    updateWOMCount();
+    if (womWheel) womWheel.setItems(womItems);
+    const rc = document.getElementById('womResultCard');
+    if (rc) rc.style.display = 'none';
+    womLastWinner = null;
+    showNotice('\uD83C\uDFAD "' + presetKey + '" preset loaded with ' + preset.length + ' fates!');
+    if (window.arcadeSound) window.arcadeSound.click();
+};
+
+// Init after DOM ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initWOM);
+} else {
+    setTimeout(initWOM, 0);
+}
