@@ -32,8 +32,9 @@ else:
         "aws" in split.netloc
     )
     
-    # Remove asyncpg-incompatible sslmode parameter from query string
-    query_params.pop("sslmode", None)
+    # Remove libpq-only query parameters that asyncpg doesn't support
+    for param in ["sslmode", "channel_binding", "gssencmode", "target_session_attrs"]:
+        query_params.pop(param, None)
     
     # Reassemble clean URL
     clean_query = urlencode(query_params, doseq=True)

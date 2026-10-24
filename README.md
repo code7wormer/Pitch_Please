@@ -117,16 +117,25 @@ When you are ready to connect your Neon PostgreSQL database:
    - **Option B (Instant Link with `?api=`)**: Share `https://pitch-please.pages.dev/?api=https://pitch-please.up.railway.app`.
    - **Option C (Admin Settings Modal)**: On the deployed Admin panel (`/admin.html`), click **⚙️ API URL** and enter your Railway backend URL.
 
-### Backend Deployment: Railway
+### Backend Deployment: Render (Free Web Service)
 
-1. In [Railway.app](https://railway.app), click **New Project** > **Deploy from GitHub repo**.
-2. Select your repository.
-3. In settings, set the **Root Directory** to `/backend`.
-4. Add the following **Variables**:
-   - `DATABASE_URL`: *(Your Neon PostgreSQL connection string)*
-   - `ADMIN_SECRET`: *(Your chosen secret key, e.g. `pitchadmin2026`)*
-   - `PORT`: `8000`
-5. Railway will automatically build using the included `Dockerfile` / `Procfile` and assign a public domain.
+1. Go to [**Render.com**](https://render.com) and log in with GitHub.
+2. Click **New +** > select **Web Service**.
+3. Connect your repository: `Pitch Please!`.
+4. Configure the settings:
+   - **Name**: `pitch-please-backend`
+   - **Language**: `Python`
+   - **Root Directory**: `backend`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+   - **Instance Type**: `Free`
+5. Under **Environment Variables**, add:
+   - `DATABASE_URL`: `postgresql://neondb_owner:npg_frgHux5V9jDK@ep-dry-haze-aoo551ug-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require`
+   - `ADMIN_SECRET`: `pitchadmin2026`
+   - `PYTHON_VERSION`: `3.11.9`
+6. Click **Deploy Web Service**.
+7. Render will build and deploy in ~2 minutes and provide your public URL:
+   `https://pitch-please-backend.onrender.com`.
 
 ---
 
