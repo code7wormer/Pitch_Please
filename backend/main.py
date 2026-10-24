@@ -74,3 +74,10 @@ async def websocket_admin(websocket: WebSocket):
         manager.disconnect_admin(websocket)
     except Exception:
         manager.disconnect_admin(websocket)
+
+if __name__ == "__main__":
+    import uvicorn
+    raw_port = os.getenv("PORT", "8000").rstrip("-").strip()
+    port = int(raw_port) if raw_port.isdigit() else 8000
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
+
