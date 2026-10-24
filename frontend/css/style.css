@@ -845,3 +845,85 @@ body::before {
     background: var(--neon-pink);
     box-shadow: 0 0 8px var(--neon-pink);
 }
+
+/* Finalize tab styling */
+.judge-score-input {
+    background: #000;
+    border: 2px solid var(--border-color);
+    color: var(--neon-yellow);
+    font-family: var(--font-hud);
+    font-size: 16px;
+    font-weight: 700;
+    padding: 8px 10px;
+    width: 80px;
+    text-align: center;
+    border-radius: var(--radius-sm);
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.judge-score-input:focus {
+    border-color: var(--neon-yellow);
+    box-shadow: 0 0 10px rgba(255, 230, 0, 0.4);
+}
+
+.final-score-pill {
+    display: inline-block;
+    padding: 6px 12px;
+    font-family: var(--font-pixel);
+    font-size: 13px;
+    background: rgba(0, 255, 102, 0.12);
+    color: var(--neon-green);
+    border: 1px solid var(--neon-green);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 0 8px var(--neon-green-glow);
+}
+
+.final-score-pill.excluded {
+    background: rgba(126, 139, 159, 0.1);
+    color: var(--text-muted);
+    border-color: var(--border-color);
+    box-shadow: none;
+}
+
+.rank-badge {
+    font-family: var(--font-pixel);
+    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    background: #000;
+    border: 1px solid var(--border-color);
+    color: #fff;
+}
+
+.rank-1 {
+    background: rgba(255, 230, 0, 0.2);
+    color: var(--neon-yellow);
+    border: 2px solid var(--neon-yellow);
+    box-shadow: 0 0 10px rgba(255, 230, 0, 0.4);
+}
+
+.rank-2 {
+    background: rgba(240, 244, 248, 0.2);
+    color: #fff;
+    border: 2px solid #fff;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.rank-3 {
+    background: rgba(255, 128, 0, 0.2);
+    color: #ff9933;
+    border: 2px solid #ff9933;
+    box-shadow: 0 0 8px rgba(255, 153, 51, 0.3);
+}
+
+.checkbox-consider {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--neon-green);
+    cursor: pointer;
+}

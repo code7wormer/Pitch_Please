@@ -38,6 +38,7 @@
         <button class="nav-tab-btn" data-tab="tabWheel">2. SPIN THE WHEEL</button>
         <button class="nav-tab-btn" data-tab="tabPoll">3. LIVE POLL CONTROLS</button>
         <button class="nav-tab-btn" data-tab="tabResults">4. ROUND 1 RESULTS &amp; AVERAGES</button>
+        <button class="nav-tab-btn" data-tab="tabFinalize">5. FINALIZE RESULTS</button>
     </nav>
 
     <!-- Global Admin Banner -->
@@ -53,7 +54,6 @@
             <div class="admin-card">
                 <div class="admin-card-header">
                     <h2 class="admin-card-title">ADD NEW TEAM</h2>
-                    <span style="font-size: 11px; color: var(--text-muted);">AUTO 6-DIGIT CODE</span>
                 </div>
                 
                 <form id="formAddTeam" style="display: flex; flex-direction: column; gap: 14px;">
@@ -75,10 +75,6 @@
                         <span>+ GENERATE CODE &amp; ADD TEAM</span>
                     </button>
                 </form>
-
-                <div style="margin-top: 20px; font-size: 12px; color: var(--text-muted); line-height: 1.5;">
-                    💡 Each team receives an exclusive 6-digit code. Share this code with the team members so they can log in on their mobile phones to vote.
-                </div>
             </div>
 
             <!-- Team Stats & Quick Overview -->
@@ -113,7 +109,6 @@
         <div class="admin-card" style="margin-top: 20px;">
             <div class="admin-card-header">
                 <h2 class="admin-card-title">CURRENTLY PLAYING TEAMS &amp; CODES</h2>
-                <span style="font-size: 11px; color: var(--text-muted);">ONE VOTE PER TEAM ENFORCED</span>
             </div>
 
             <div class="team-table-wrapper">
@@ -167,7 +162,6 @@
                 <div class="admin-card">
                     <div class="admin-card-header">
                         <h2 class="admin-card-title">MANUAL SELECT OPTION</h2>
-                        <span style="font-size: 11px; color: var(--text-muted);">BYPASS WHEEL</span>
                     </div>
 
                     <div style="display: flex; flex-direction: column; gap: 12px;">
@@ -218,7 +212,6 @@
             <div class="admin-card">
                 <div class="admin-card-header">
                     <h2 class="admin-card-title">POLL SETUP</h2>
-                    <span style="font-size: 11px; color: var(--neon-green);">ROUND 1 (1–10)</span>
                 </div>
 
                 <div style="margin-bottom: 16px;">
@@ -257,9 +250,6 @@
                 <button id="btnStartPoll" class="btn-arcade" style="padding: 18px;">
                     <span>🚀 START VOTING POLL</span>
                 </button>
-                <div style="font-size: 11px; color: var(--text-muted); text-align: center; margin-top: 8px;">
-                    Will push the voting interface to all signed-in team devices simultaneously.
-                </div>
             </div>
 
             <!-- Active Poll Live HUD -->
@@ -311,7 +301,7 @@
                 <div>
                     <h2 class="admin-card-title">ROUND 1 PITCH RESULTS &amp; AVERAGES</h2>
                     <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-                        Out of 10 &bull; One vote per team &bull; Test results can be deleted
+                        Audience &amp; Peer Voting Results
                     </div>
                 </div>
                 <button id="btnRefreshResults" class="btn-arcade-secondary" style="padding: 6px 12px; font-size: 10px;">
@@ -325,6 +315,67 @@
                     No completed polls yet. Complete a vote to see the average scores here.
                 </div>
             </div>
+        </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 5: FINALIZE RESULTS & SCOREBOARD
+         ========================================== -->
+    <section id="tabFinalize" class="tab-content">
+        <div class="admin-card">
+            <div class="admin-card-header">
+                <div>
+                    <h2 class="admin-card-title">ROUND 1 FINAL SCOREBOARD &amp; QUALIFICATION</h2>
+                    <div style="font-size: 11px; color: var(--neon-cyan); margin-top: 4px; letter-spacing: 1px;">
+                        WEIGHTAGE: 60% AUDIENCE / PEER VOTING &bull; 40% JUDGE'S SCORE
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button id="btnExportExcel" class="btn-arcade" style="padding: 10px 16px; font-size: 11px; background: var(--neon-green);">
+                        <span>📥 EXPORT TO EXCEL (.XLSX)</span>
+                    </button>
+                    <button id="btnRefreshFinalize" class="btn-arcade-secondary" style="padding: 10px 14px; font-size: 11px;">
+                        REFRESH
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scoring Info Banner -->
+            <div style="background: rgba(0, 229, 255, 0.05); border: 1px solid var(--neon-cyan); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div style="font-size: 13px; color: #fff;">
+                    <strong style="color: var(--neon-green);">Scoring Formula:</strong>
+                    <span style="font-family: var(--font-hud); color: #fff; margin-left: 8px;">
+                        Final Score = (Voting Avg × 60%) + (Judge's Score × 40%)
+                    </span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted);">
+                    Select which teams to consider and enter each Judge's score (0–10).
+                </div>
+            </div>
+
+            <!-- Final Table -->
+            <div class="team-table-wrapper">
+                <table class="team-table" id="finalizeTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px; text-align: center;">CONSIDER</th>
+                            <th style="width: 70px; text-align: center;">RANK</th>
+                            <th>TEAM NAME</th>
+                            <th style="text-align: center;">VOTING SCORE (60%)</th>
+                            <th style="text-align: center; width: 180px;">JUDGE'S SCORE (40%)</th>
+                            <th style="text-align: right; width: 170px;">FINAL SCORE (/10)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="finalizeTableBody">
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                                Loading teams and scores...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
         </div>
     </section>
 
@@ -404,6 +455,7 @@
 <script src="js/config.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/wheel.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="js/admin.js"></script>
 </body>
 </html>

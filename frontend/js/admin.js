@@ -44,6 +44,9 @@ let currentPitcher = null;
 let activePoll = null;
 let pollCountdownInterval = null;
 let pitchWheel = null;
+let judgeScores = JSON.parse(localStorage.getItem('pitch_judge_scores') || '{}');
+let consideredTeams = JSON.parse(localStorage.getItem('pitch_considered_teams') || '{}');
+let finalizedRowsCache = [];
 
 // DOM Elements
 const adminAuthModal = document.getElementById('adminAuthModal');
@@ -93,6 +96,11 @@ const btnEndPoll = document.getElementById('btnEndPoll');
 // Results tab elements
 const btnRefreshResults = document.getElementById('btnRefreshResults');
 const resultsList = document.getElementById('resultsList');
+
+// Finalize tab elements
+const btnExportExcel = document.getElementById('btnExportExcel');
+const btnRefreshFinalize = document.getElementById('btnRefreshFinalize');
+const finalizeTableBody = document.getElementById('finalizeTableBody');
 
 // API Modal elements
 const btnConfigApi = document.getElementById('btnConfigApi');
@@ -204,6 +212,10 @@ function bindEvents() {
 
     // Results
     btnRefreshResults.addEventListener('click', fetchResults);
+
+    // Finalize Results & Export
+    if (btnRefreshFinalize) btnRefreshFinalize.addEventListener('click', loadFinalizeTable);
+    if (btnExportExcel) btnExportExcel.addEventListener('click', exportFinalResultsToExcel);
 }
 
 function switchTab(tabId) {
@@ -222,6 +234,9 @@ function switchTab(tabId) {
     }
     if (tabId === 'tabResults') {
         fetchResults();
+    }
+    if (tabId === 'tabFinalize') {
+        loadFinalizeTable();
     }
 }
 
@@ -743,12 +758,12 @@ function renderResults(results) {
                             <div style="font-size: 10px; color: var(--neon-cyan); letter-spacing: 1px;">ROUND 1 AVERAGE</div>
                         </div>
 
-                        <!-- Delete result button for testing -->
+                        <!-- Delete result button -->
                         <button 
                             class="btn-arcade-danger" 
                             style="padding: 8px 12px; font-size: 9px;"
                             onclick="deletePollResult(${r.poll_id}, '${escapeHtml(r.pitching_team_name)}')"
-                            title="Delete this result (useful for test votes)"
+                            title="Delete this poll result"
                         >
                             🗑️ DELETE
                         </button>
@@ -769,7 +784,7 @@ function renderResults(results) {
 }
 
 window.deletePollResult = async (pollId, teamName) => {
-    if (!confirm(`Delete all voting results for "${teamName}" (Poll #${pollId})?\n\nThis will permanently delete these votes and remove it from the averages. Useful for clearing test runs.`)) {
+    if (!confirm(`Permanently delete voting results for "${teamName}" (Poll #${pollId})?`)) {
         return;
     }
 
@@ -883,3 +898,279 @@ function escapeHtml(str) {
         "'": '&#039;'
     })[m]);
 }
+
+// ==========================================
+// TAB 5: FINALIZE RESULTS & EXCEL EXPORT
+// Weightage: 60% Peer/Audience + 40% Judges
+// ==========================================
+async function loadFinalizeTable() {
+    if (!finalizeTableBody) return;
+
+    finalizeTableBody.innerHTML = `
+        <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                Computing latest scores and rankings...
+            </td>
+        </tr>
+    `;
+
+    try {
+        const [teamsRes, resultsRes] = await Promise.all([
+            fetch(`${API_BASE}/api/admin/teams`, { headers: { 'x-admin-key': adminKey } }),
+            fetch(`${API_BASE}/api/admin/results`, { headers: { 'x-admin-key': adminKey } })
+        ]);
+
+        if (!teamsRes.ok || !resultsRes.ok) throw new Error('Failed to load final scoreboard data');
+
+        const teams = await teamsRes.json();
+        const results = await resultsRes.json();
+
+        // Map teamId to latest voting average
+        const teamVotingMap = {};
+        results.forEach(r => {
+            if (teamVotingMap[r.pitching_team_id] === undefined) {
+                teamVotingMap[r.pitching_team_id] = r.average_score;
+            }
+        });
+
+        // Filter to active teams
+        const activeOnly = teams.filter(t => t.is_active);
+
+        finalizedRowsCache = activeOnly.map(t => {
+            const hasScore = teamVotingMap[t.id] !== undefined;
+            const votingAvg = hasScore ? teamVotingMap[t.id] : 0.0;
+            const judgeVal = judgeScores[t.id] !== undefined ? judgeScores[t.id] : '';
+            const judgeNum = judgeVal !== '' ? (parseFloat(judgeVal) || 0.0) : 0.0;
+            
+            const isConsidered = consideredTeams[t.id] !== undefined ? Boolean(consideredTeams[t.id]) : true;
+            const finalScore = isConsidered ? ((votingAvg * 0.6) + (judgeNum * 0.4)) : 0.0;
+
+            return {
+                id: t.id,
+                name: t.name,
+                code: t.code,
+                hasVoted: hasScore,
+                votingAvg: votingAvg,
+                votingWeighted: votingAvg * 0.6,
+                judgeVal: judgeVal,
+                judgeNum: judgeNum,
+                judgeWeighted: judgeNum * 0.4,
+                isConsidered: isConsidered,
+                finalScore: finalScore
+            };
+        });
+
+        renderFinalizeTable();
+    } catch (e) {
+        showNotice(e.message, true);
+    }
+}
+
+function renderFinalizeTable() {
+    if (!finalizeTableBody) return;
+
+    if (!finalizedRowsCache || finalizedRowsCache.length === 0) {
+        finalizeTableBody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                    No teams registered yet.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    // Sort: Considered teams first by finalScore descending, then unconsidered
+    const considered = finalizedRowsCache.filter(r => r.isConsidered);
+    const unconsidered = finalizedRowsCache.filter(r => !r.isConsidered);
+
+    considered.sort((a, b) => b.finalScore - a.finalScore);
+    considered.forEach((r, idx) => {
+        r.rank = idx + 1;
+    });
+
+    const displayList = [...considered, ...unconsidered];
+
+    finalizeTableBody.innerHTML = displayList.map(r => {
+        let rankHtml = '<span style="color: var(--text-muted);">-</span>';
+        if (r.isConsidered) {
+            let rankClass = 'rank-badge';
+            let medal = '';
+            if (r.rank === 1) { rankClass += ' rank-1'; medal = '🥇 '; }
+            else if (r.rank === 2) { rankClass += ' rank-2'; medal = '🥈 '; }
+            else if (r.rank === 3) { rankClass += ' rank-3'; medal = '🥉 '; }
+
+            rankHtml = `<span class="${rankClass}">${medal}${r.rank}</span>`;
+        }
+
+        const votingDisplay = r.hasVoted 
+            ? `<div style="font-family: var(--font-pixel); font-size: 13px; color: #fff;">${r.votingAvg.toFixed(2)} / 10</div>
+               <div style="font-size: 10px; color: var(--neon-cyan); margin-top: 2px;">60% = +${r.votingWeighted.toFixed(2)}</div>`
+            : `<div style="color: var(--text-muted); font-size: 12px; font-style: italic;">No votes yet</div>`;
+
+        return `
+            <tr style="${r.isConsidered ? '' : 'opacity: 0.45; background: rgba(0,0,0,0.3);'}">
+                <td style="text-align: center;">
+                    <input 
+                        type="checkbox" 
+                        class="checkbox-consider" 
+                        ${r.isConsidered ? 'checked' : ''} 
+                        onchange="toggleTeamConsidered(${r.id}, this.checked)"
+                        title="Include in final scoreboard"
+                    >
+                </td>
+                <td style="text-align: center;">
+                    ${rankHtml}
+                </td>
+                <td>
+                    <strong style="color: #fff; font-size: 15px;">${escapeHtml(r.name)}</strong>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">#${r.code}</div>
+                </td>
+                <td style="text-align: center;">
+                    ${votingDisplay}
+                </td>
+                <td style="text-align: center;">
+                    <input 
+                        type="number" 
+                        min="0" 
+                        max="10" 
+                        step="0.1" 
+                        placeholder="0.0" 
+                        value="${r.judgeVal}" 
+                        class="judge-score-input"
+                        ${r.isConsidered ? '' : 'disabled'}
+                        oninput="onJudgeScoreChange(${r.id}, this.value)"
+                    >
+                    <div style="font-size: 10px; color: var(--neon-yellow); margin-top: 2px;">
+                        40% = +${r.judgeWeighted.toFixed(2)}
+                    </div>
+                </td>
+                <td style="text-align: right;">
+                    <span class="final-score-pill ${r.isConsidered ? '' : 'excluded'}">
+                        ${r.isConsidered ? r.finalScore.toFixed(2) + ' / 10' : 'EXCLUDED'}
+                    </span>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+window.toggleTeamConsidered = (teamId, isChecked) => {
+    consideredTeams[teamId] = isChecked;
+    localStorage.setItem('pitch_considered_teams', JSON.stringify(consideredTeams));
+    
+    const row = finalizedRowsCache.find(r => r.id === teamId);
+    if (row) {
+        row.isConsidered = isChecked;
+        row.finalScore = isChecked ? ((row.votingAvg * 0.6) + (row.judgeNum * 0.4)) : 0.0;
+    }
+    renderFinalizeTable();
+    if (window.arcadeSound) window.arcadeSound.click();
+};
+
+window.onJudgeScoreChange = (teamId, val) => {
+    judgeScores[teamId] = val;
+    localStorage.setItem('pitch_judge_scores', JSON.stringify(judgeScores));
+
+    const num = val !== '' ? Math.max(0, Math.min(10, parseFloat(val) || 0)) : 0.0;
+    const row = finalizedRowsCache.find(r => r.id === teamId);
+    if (row) {
+        row.judgeVal = val;
+        row.judgeNum = num;
+        row.judgeWeighted = num * 0.4;
+        row.finalScore = row.isConsidered ? ((row.votingAvg * 0.6) + row.judgeWeighted) : 0.0;
+    }
+    renderFinalizeTable();
+};
+
+function exportFinalResultsToExcel() {
+    if (!finalizedRowsCache || finalizedRowsCache.length === 0) {
+        showNotice('No results to export yet.', true);
+        return;
+    }
+
+    const considered = finalizedRowsCache.filter(r => r.isConsidered).sort((a, b) => b.finalScore - a.finalScore);
+    const unconsidered = finalizedRowsCache.filter(r => !r.isConsidered);
+    const exportList = [...considered, ...unconsidered];
+    const timestamp = new Date().toLocaleString();
+
+    if (window.XLSX) {
+        const wb = XLSX.utils.book_new();
+
+        const sheetData = [
+            ["DIMENSIONS CLUB — PITCH PLEASE!"],
+            ["ROUND 1 OFFICIAL FINAL SCOREBOARD & QUALIFICATION RESULTS"],
+            ["Formula: (Peer / Audience Voting Avg × 60%) + (Judge's Score × 40%)"],
+            ["Export Date & Time:", timestamp],
+            [], // blank spacer
+            [
+                "Rank",
+                "Team Name",
+                "Team Code",
+                "Peer Voting Score (Out of 10)",
+                "Voting Weighted (60%)",
+                "Judge's Score (Out of 10)",
+                "Judge Weighted (40%)",
+                "Final Score (Out of 10)",
+                "Status"
+            ]
+        ];
+
+        exportList.forEach((r, idx) => {
+            sheetData.push([
+                r.isConsidered ? (idx + 1) : "N/A",
+                r.name,
+                "#" + r.code,
+                r.hasVoted ? parseFloat(r.votingAvg.toFixed(2)) : 0.0,
+                parseFloat(r.votingWeighted.toFixed(2)),
+                parseFloat(r.judgeNum.toFixed(2)),
+                parseFloat(r.judgeWeighted.toFixed(2)),
+                parseFloat(r.finalScore.toFixed(2)),
+                r.isConsidered ? "CONSIDERED / QUALIFIED" : "EXCLUDED"
+            ]);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+        // Auto column widths
+        ws['!cols'] = [
+            { wch: 8 },  // Rank
+            { wch: 28 }, // Team Name
+            { wch: 14 }, // Code
+            { wch: 28 }, // Peer Voting
+            { wch: 22 }, // 60%
+            { wch: 24 }, // Judge Score
+            { wch: 22 }, // 40%
+            { wch: 24 }, // Final Score
+            { wch: 26 }  // Status
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, "Round 1 Final Scores");
+        XLSX.writeFile(wb, `Pitch_Please_Round1_Final_Results_${Date.now()}.xlsx`);
+        showNotice("📥 Excel workbook downloaded successfully!");
+        if (window.arcadeSound) window.arcadeSound.winnerFanfare();
+    } else {
+        // Fallback: CSV export that opens directly in Microsoft Excel
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "DIMENSIONS CLUB — PITCH PLEASE! ROUND 1 FINAL RESULTS\n";
+        csvContent += `Formula: (Peer Voting * 60%) + (Judge Score * 40%)\n`;
+        csvContent += `Exported: ${timestamp}\n\n`;
+        csvContent += "Rank,Team Name,Team Code,Voting Score (10),Voting 60%,Judge Score (10),Judge 40%,Final Score (10),Status\n";
+
+        exportList.forEach((r, idx) => {
+            const rankStr = r.isConsidered ? (idx + 1) : "N/A";
+            const statusStr = r.isConsidered ? "CONSIDERED" : "EXCLUDED";
+            csvContent += `"${rankStr}","${r.name.replace(/"/g, '""')}","#${r.code}",${r.votingAvg.toFixed(2)},${r.votingWeighted.toFixed(2)},${r.judgeNum.toFixed(2)},${r.judgeWeighted.toFixed(2)},${r.finalScore.toFixed(2)},"${statusStr}"\n`;
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Pitch_Please_Round1_Final_Results_${Date.now()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showNotice("📥 Results exported as CSV!");
+    }
+}
+
