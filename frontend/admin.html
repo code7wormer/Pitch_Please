@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pitch Please! — Admin Command Panel</title>
+    <link rel="icon" type="image/png" href="assets/dimensions_logo.png">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="admin-container">
+
+    <!-- Admin Header -->
+    <header class="admin-header">
+        <div class="admin-title-group">
+            <img src="assets/dimensions_logo.png" alt="Dimensions Logo" class="brand-logo-img">
+            <div>
+                <h1 style="font-family: var(--font-pixel); font-size: 16px; color: #fff;">PITCH PLEASE! ADMIN</h1>
+                <div style="font-size: 11px; color: var(--neon-green); letter-spacing: 1px;">DIMENSIONS EVENT CONTROL MAIN-FRAME</div>
+            </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center;">
+                <span class="connection-dot" id="adminConnDot"></span>
+                <span id="adminWsStatus">CONNECTED</span>
+            </div>
+            <button id="btnSoundToggle" class="btn-arcade-secondary" style="padding: 6px 10px; font-size: 10px;">🔊 SOUND</button>
+            <button id="btnConfigApi" class="btn-arcade-secondary" style="padding: 6px 10px; font-size: 10px;">⚙️ API URL</button>
+            <button id="btnAdminLogout" class="btn-arcade-danger" style="padding: 6px 10px; font-size: 10px;">LOGOUT</button>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="admin-nav-tabs">
+        <button class="nav-tab-btn active" data-tab="tabTeams">1. TEAMS &amp; CODES</button>
+        <button class="nav-tab-btn" data-tab="tabWheel">2. SPIN THE WHEEL</button>
+        <button class="nav-tab-btn" data-tab="tabPoll">3. LIVE POLL CONTROLS</button>
+        <button class="nav-tab-btn" data-tab="tabResults">4. ROUND 1 RESULTS &amp; AVERAGES</button>
+    </nav>
+
+    <!-- Global Admin Banner -->
+    <div id="adminNotice" class="error-banner" style="margin-bottom: 16px;"></div>
+
+    <!-- ==========================================
+         TAB 1: TEAMS & CODES MANAGEMENT
+         ========================================== -->
+    <section id="tabTeams" class="tab-content active">
+        <div class="admin-grid-2col">
+            
+            <!-- Add Team Form -->
+            <div class="admin-card">
+                <div class="admin-card-header">
+                    <h2 class="admin-card-title">ADD NEW TEAM</h2>
+                    <span style="font-size: 11px; color: var(--text-muted);">AUTO 6-DIGIT CODE</span>
+                </div>
+                
+                <form id="formAddTeam" style="display: flex; flex-direction: column; gap: 14px;">
+                    <div>
+                        <label style="font-family: var(--font-pixel); font-size: 9px; color: var(--text-muted); display: block; margin-bottom: 6px;">
+                            TEAM NAME
+                        </label>
+                        <input 
+                            type="text" 
+                            id="inputTeamName" 
+                            placeholder="e.g. Pixel Pioneers" 
+                            style="width: 100%; background: #000; border: 2px solid var(--border-color); color: #fff; padding: 12px; font-family: var(--font-hud); font-size: 15px; border-radius: var(--radius-sm);"
+                            required
+                            autocomplete="off"
+                        >
+                    </div>
+
+                    <button type="submit" id="btnAddTeam" class="btn-arcade">
+                        <span>+ GENERATE CODE &amp; ADD TEAM</span>
+                    </button>
+                </form>
+
+                <div style="margin-top: 20px; font-size: 12px; color: var(--text-muted); line-height: 1.5;">
+                    💡 Each team receives an exclusive 6-digit code. Share this code with the team members so they can log in on their mobile phones to vote.
+                </div>
+            </div>
+
+            <!-- Team Stats & Quick Overview -->
+            <div class="admin-card">
+                <div class="admin-card-header">
+                    <h2 class="admin-card-title">EVENT OVERVIEW</h2>
+                    <button id="btnRefreshTeams" class="btn-arcade-secondary" style="padding: 4px 8px; font-size: 9px;">REFRESH</button>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                    <div style="background: #000; padding: 14px; text-align: center; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <div style="font-family: var(--font-pixel); font-size: 24px; color: var(--neon-green);" id="countActiveTeams">0</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">ACTIVE TEAMS</div>
+                    </div>
+                    <div style="background: #000; padding: 14px; text-align: center; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <div style="font-family: var(--font-pixel); font-size: 24px; color: var(--neon-cyan);" id="countTotalTeams">0</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">TOTAL REGISTERED</div>
+                    </div>
+                </div>
+
+                <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 12px; border-radius: var(--radius-sm); font-size: 13px;">
+                    <strong style="color: var(--neon-green);">Current Pitching Team:</strong>
+                    <div id="quickPitchingTeamDisplay" style="font-family: var(--font-pixel); font-size: 13px; color: #fff; margin-top: 6px;">
+                        NONE SELECTED YET
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Registered Teams Table -->
+        <div class="admin-card" style="margin-top: 20px;">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">CURRENTLY PLAYING TEAMS &amp; CODES</h2>
+                <span style="font-size: 11px; color: var(--text-muted);">ONE VOTE PER TEAM ENFORCED</span>
+            </div>
+
+            <div class="team-table-wrapper">
+                <table class="team-table">
+                    <thead>
+                        <tr>
+                            <th>TEAM NAME</th>
+                            <th>6-DIGIT CODE</th>
+                            <th>STATUS</th>
+                            <th style="text-align: right;">ACTIONS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="teamsTableBody">
+                        <tr>
+                            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                                No teams registered yet. Use the form above to add your first team.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 2: SPIN THE WHEEL / SELECT PITCHER
+         ========================================== -->
+    <section id="tabWheel" class="tab-content">
+        <div class="admin-grid-2col">
+            
+            <!-- Wheel Roulette Canvas -->
+            <div class="admin-card" style="text-align: center;">
+                <div class="admin-card-header">
+                    <h2 class="admin-card-title">ROULETTE WHEEL OF PITCH</h2>
+                    <span style="font-size: 11px; color: var(--neon-green);">ACTIVE TEAMS ONLY</span>
+                </div>
+
+                <div class="wheel-wrapper">
+                    <canvas id="wheelCanvas" width="360" height="360"></canvas>
+                    
+                    <button id="btnSpinWheel" class="btn-arcade" style="max-width: 300px;">
+                        <span>🎡 SPIN THE WHEEL!</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Manual Pitcher Selection & Pitch Status -->
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+                
+                <!-- Manual Select Option -->
+                <div class="admin-card">
+                    <div class="admin-card-header">
+                        <h2 class="admin-card-title">MANUAL SELECT OPTION</h2>
+                        <span style="font-size: 11px; color: var(--text-muted);">BYPASS WHEEL</span>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <label style="font-family: var(--font-pixel); font-size: 9px; color: var(--text-muted);">
+                            CHOOSE TEAM MANUALLY:
+                        </label>
+                        <select id="selectManualTeam" style="width: 100%; background: #000; border: 2px solid var(--border-color); color: #fff; padding: 12px; font-family: var(--font-hud); font-size: 15px; border-radius: var(--radius-sm);">
+                            <option value="">-- Select a Team --</option>
+                        </select>
+                        <button id="btnManualSelect" class="btn-arcade-secondary" style="padding: 12px;">
+                            SELECT AS NEXT PITCHER
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Selected Pitcher Card -->
+                <div class="admin-card" style="background: rgba(0, 229, 255, 0.05); border-color: var(--neon-cyan);">
+                    <div class="admin-card-header" style="border-color: rgba(0, 229, 255, 0.2);">
+                        <h2 class="admin-card-title" style="color: var(--neon-cyan);">SELECTED PITCHING TEAM</h2>
+                    </div>
+
+                    <div style="text-align: center; padding: 14px 0;">
+                        <div id="selectedPitcherBigName" style="font-family: var(--font-pixel); font-size: 20px; color: #fff; margin-bottom: 8px;">
+                            NONE SELECTED
+                        </div>
+                        <div id="selectedPitcherCodeBadge" style="font-size: 13px; color: var(--neon-cyan);">
+                            Spin wheel or choose manually above
+                        </div>
+                    </div>
+
+                    <button id="btnGoToPoll" class="btn-arcade" style="margin-top: 12px;" disabled>
+                        <span>PROCEED TO START VOTING &gt;</span>
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 3: LIVE POLL CONTROLS
+         ========================================== -->
+    <section id="tabPoll" class="tab-content">
+        <div class="admin-grid-2col">
+            
+            <!-- Poll Setup & Trigger -->
+            <div class="admin-card">
+                <div class="admin-card-header">
+                    <h2 class="admin-card-title">POLL SETUP</h2>
+                    <span style="font-size: 11px; color: var(--neon-green);">ROUND 1 (1–10)</span>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label style="font-family: var(--font-pixel); font-size: 9px; color: var(--text-muted); display: block; margin-bottom: 6px;">
+                        TEAM PITCHING:
+                    </label>
+                    <div id="pollTargetTeamDisplay" style="background: #000; border: 2px solid var(--border-color); padding: 12px; font-family: var(--font-pixel); font-size: 14px; color: var(--neon-green); border-radius: var(--radius-sm);">
+                        NO TEAM SELECTED
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label style="font-family: var(--font-pixel); font-size: 9px; color: var(--text-muted); display: block; margin-bottom: 6px;">
+                        CHOOSE POLL DURATION:
+                    </label>
+                    <div class="duration-selector">
+                        <div class="duration-opt">
+                            <input type="radio" id="dur15" name="pollDuration" value="15">
+                            <label for="dur15">15 SEC</label>
+                        </div>
+                        <div class="duration-opt">
+                            <input type="radio" id="dur30" name="pollDuration" value="30" checked>
+                            <label for="dur30">30 SEC</label>
+                        </div>
+                        <div class="duration-opt">
+                            <input type="radio" id="dur60" name="pollDuration" value="60">
+                            <label for="dur60">1 MIN</label>
+                        </div>
+                        <div class="duration-opt">
+                            <input type="radio" id="dur120" name="pollDuration" value="120">
+                            <label for="dur120">2 MIN</label>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="btnStartPoll" class="btn-arcade" style="padding: 18px;">
+                    <span>🚀 START VOTING POLL</span>
+                </button>
+                <div style="font-size: 11px; color: var(--text-muted); text-align: center; margin-top: 8px;">
+                    Will push the voting interface to all signed-in team devices simultaneously.
+                </div>
+            </div>
+
+            <!-- Active Poll Live HUD -->
+            <div class="admin-card" id="activePollHudCard">
+                <div class="admin-card-header">
+                    <h2 class="admin-card-title">LIVE POLL DASHBOARD</h2>
+                    <span id="pollStatusBadge" class="status-badge status-paused">INACTIVE</span>
+                </div>
+
+                <div style="text-align: center; padding: 10px 0;">
+                    <div style="font-family: var(--font-pixel); font-size: 10px; color: var(--text-muted); margin-bottom: 4px;">
+                        REMAINING TIME
+                    </div>
+                    <div id="adminPollTimer" class="timer-digits" style="font-size: 48px;">
+                        00:00
+                    </div>
+
+                    <div style="margin: 16px 0; background: #000; border: 1px solid var(--border-color); padding: 12px; border-radius: var(--radius-sm);">
+                        <div style="font-family: var(--font-pixel); font-size: 9px; color: var(--neon-cyan); margin-bottom: 4px;">
+                            VOTES IN
+                        </div>
+                        <div style="font-family: var(--font-pixel); font-size: 26px; color: #fff;">
+                            <span id="liveVoteCount">0</span> / <span id="liveVoteEligible">0</span> Teams
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Action Controls During Poll -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                    <button id="btnExtendPoll" class="btn-arcade-secondary" style="padding: 12px;" disabled>
+                        <span>⏳ EXTEND +15s</span>
+                    </button>
+                    <button id="btnEndPoll" class="btn-arcade-danger" style="padding: 12px;" disabled>
+                        <span>⏹️ END POLL NOW</span>
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 4: ROUND 1 RESULTS & AVERAGES
+         ========================================== -->
+    <section id="tabResults" class="tab-content">
+        <div class="admin-card">
+            <div class="admin-card-header">
+                <div>
+                    <h2 class="admin-card-title">ROUND 1 PITCH RESULTS &amp; AVERAGES</h2>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                        Out of 10 &bull; One vote per team &bull; Test results can be deleted
+                    </div>
+                </div>
+                <button id="btnRefreshResults" class="btn-arcade-secondary" style="padding: 6px 12px; font-size: 10px;">
+                    REFRESH RESULTS
+                </button>
+            </div>
+
+            <!-- Results List Container -->
+            <div id="resultsList" style="display: flex; flex-direction: column; gap: 16px;">
+                <div style="text-align: center; color: var(--text-muted); padding: 30px;">
+                    No completed polls yet. Complete a vote to see the average scores here.
+                </div>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<!-- Admin Login Passkey Modal -->
+<div id="adminAuthModal" class="modal-overlay" style="display: flex;">
+    <div class="modal-card">
+        <img src="assets/dimensions_logo.png" alt="Dimensions" style="height: 50px; margin-bottom: 12px;">
+        <h2 style="font-family: var(--font-pixel); font-size: 14px; color: #fff; margin-bottom: 12px;">
+            ADMIN AUTHENTICATION
+        </h2>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+            Enter the admin secret passkey to access the event command center.
+        </p>
+
+        <form id="formAdminAuth" style="display: flex; flex-direction: column; gap: 12px;">
+            <input 
+                type="password" 
+                id="inputAdminKey" 
+                placeholder="Enter admin secret..." 
+                style="background: #000; border: 2px solid var(--neon-green); color: #fff; padding: 14px; font-family: var(--font-hud); font-size: 16px; border-radius: var(--radius-sm); text-align: center;"
+                value="pitchadmin2026"
+                required
+            >
+            <button type="submit" class="btn-arcade">
+                <span>ENTER COMMAND CENTER</span> &gt;
+            </button>
+            <div id="adminAuthError" class="error-banner" style="display: none;"></div>
+        </form>
+    </div>
+</div>
+
+<!-- API Base URL Settings Modal -->
+<div id="apiUrlModal" class="modal-overlay">
+    <div class="modal-card">
+        <h2 style="font-family: var(--font-pixel); font-size: 14px; color: var(--neon-green); margin-bottom: 12px;">
+            BACKEND API ENDPOINT
+        </h2>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px; text-align: left;">
+            When deployed on Cloudflare Pages, specify your Railway backend URL (e.g. <code>https://pitch-please.up.railway.app</code>). Leave blank for local dev (<code>http://localhost:8000</code>).
+        </p>
+
+        <input 
+            type="text" 
+            id="inputCustomApiUrl" 
+            placeholder="http://localhost:8000"
+            style="width: 100%; background: #000; border: 2px solid var(--border-color); color: #fff; padding: 12px; font-family: var(--font-hud); font-size: 14px; margin-bottom: 16px; border-radius: var(--radius-sm);"
+        >
+
+        <div style="display: flex; gap: 10px;">
+            <button id="btnSaveApiUrl" class="btn-arcade" style="flex: 1;">SAVE</button>
+            <button id="btnCloseApiModal" class="btn-arcade-secondary" style="flex: 1;">CANCEL</button>
+        </div>
+    </div>
+</div>
+
+<!-- Winner Pop-up Modal for Roulette Wheel -->
+<div id="winnerModal" class="modal-overlay">
+    <div class="modal-card" style="border-color: var(--neon-yellow); box-shadow: 0 0 35px rgba(255, 230, 0, 0.4);">
+        <div style="font-size: 40px; margin-bottom: 10px;">🏆</div>
+        <div style="font-family: var(--font-pixel); font-size: 10px; color: var(--neon-yellow); margin-bottom: 6px;">
+            THE WHEEL HAS SPOKEN!
+        </div>
+        <div id="winnerModalTeamName" style="font-family: var(--font-pixel); font-size: 22px; color: #fff; margin-bottom: 16px; word-break: break-word;">
+            TEAM NAME
+        </div>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
+            This team has been selected to take the stage and pitch their game.
+        </p>
+        <button id="btnConfirmWinner" class="btn-arcade" style="background: var(--neon-yellow); color: #000; box-shadow: 0 5px 0 #998a00;">
+            <span>ACCEPT &amp; GO TO POLL CONTROLS</span> &gt;
+        </button>
+    </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/wheel.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

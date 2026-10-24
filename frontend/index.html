@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pitch Please! — Dimensions Gaming Event</title>
+    <link rel="icon" type="image/png" href="assets/dimensions_logo.png">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="app-container">
+
+    <!-- Top Branding Header -->
+    <header class="event-header">
+        <div class="brand-badge">
+            <img src="assets/dimensions_logo.png" alt="Dimensions Logo" class="brand-logo-img">
+            <span class="brand-club-name">DIMENSIONS</span>
+        </div>
+        <h1 class="event-title">PITCH PLEASE!</h1>
+        <div class="event-subtitle">Live Game Pitch Battles &bull; Round 1</div>
+    </header>
+
+    <!-- VIEW 1: SIGN IN (Large Centered Code Entry Box) -->
+    <main id="viewLogin" class="login-view">
+        <div class="pin-entry-card">
+            <label for="teamCodeInput" class="pin-label">ENTER 6-DIGIT TEAM CODE</label>
+            <input 
+                type="text" 
+                id="teamCodeInput" 
+                class="pin-input" 
+                maxlength="6" 
+                inputmode="numeric" 
+                pattern="[0-9]*" 
+                placeholder="000000"
+                autocomplete="off"
+                autofocus
+            >
+            <div id="loginError" class="error-banner" style="margin-top: 14px;"></div>
+        </div>
+
+        <button id="btnSubmitLogin" class="btn-arcade">
+            <span>START PLAYING</span> &gt;
+        </button>
+    </main>
+
+    <!-- VIEW 2: SIGNED-IN TEAM ARENA -->
+    <main id="viewTeam" style="display: none; flex-direction: column; flex: 1;">
+        
+        <!-- Team Status HUD -->
+        <div class="team-hud-bar">
+            <div class="team-badge-name">
+                <span class="connection-dot" id="teamConnDot"></span>
+                <span id="displayTeamName">Team Name</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="team-badge-code" id="displayTeamCode">#000000</span>
+                <button id="btnLogout" class="btn-logout" title="Sign out on this device">Exit</button>
+            </div>
+        </div>
+
+        <!-- Global Status / Error Message -->
+        <div id="teamErrorBanner" class="error-banner" style="margin-bottom: 12px;"></div>
+
+        <!-- SUBSTATE 1: WAITING FOR NEXT PITCH -->
+        <div id="stateWaiting" class="waiting-card">
+            <div class="pulse-radar">📡</div>
+            <h2 class="waiting-title">WAITING FOR NEXT PITCH...</h2>
+            <p class="waiting-sub">Stay on this screen. Voting will automatically activate on your device when a team pitches.</p>
+        </div>
+
+        <!-- SUBSTATE 2: YOU ARE THE PITCHING TEAM (CANNOT VOTE) -->
+        <div id="statePitchingNotice" class="pitcher-notice-card" style="display: none;">
+            <div class="pitcher-notice-icon">🎤</div>
+            <h2 style="font-family: var(--font-pixel); font-size: 16px; color: var(--neon-yellow); line-height: 1.5;">
+                YOUR TEAM IS PITCHING NOW!
+            </h2>
+            <p style="font-size: 14px; color: #fff; line-height: 1.6;">
+                Give it everything you've got! Other teams are currently reviewing and scoring your game pitch.
+            </p>
+            <div style="font-size: 12px; color: var(--text-muted); font-style: italic;">
+                (Teams cannot vote on their own pitch)
+            </div>
+        </div>
+
+        <!-- SUBSTATE 3: ACTIVE VOTING POLL (ROUND 1 SCORE 1-10) -->
+        <div id="stateVoting" class="voting-screen" style="display: none;">
+            
+            <!-- Digital Timer HUD -->
+            <div class="timer-card">
+                <div class="timer-label">POLL CLOSES IN</div>
+                <div id="pollCountdown" class="timer-digits">00:30</div>
+            </div>
+
+            <!-- Pitching Team Target Banner -->
+            <div class="pitch-target-card">
+                <div class="pitch-target-label">NOW PITCHING</div>
+                <div id="pitchingTeamName" class="pitch-target-team">TEAM NAME</div>
+            </div>
+
+            <!-- 1 to 10 Score Selector Grid -->
+            <div class="score-section">
+                <div class="score-section-title">RATE THIS PITCH (1 TO 10)</div>
+                <div class="score-grid">
+                    <button type="button" class="score-btn" data-score="1">1</button>
+                    <button type="button" class="score-btn" data-score="2">2</button>
+                    <button type="button" class="score-btn" data-score="3">3</button>
+                    <button type="button" class="score-btn" data-score="4">4</button>
+                    <button type="button" class="score-btn" data-score="5">5</button>
+                    <button type="button" class="score-btn" data-score="6">6</button>
+                    <button type="button" class="score-btn" data-score="7">7</button>
+                    <button type="button" class="score-btn" data-score="8">8</button>
+                    <button type="button" class="score-btn" data-score="9">9</button>
+                    <button type="button" class="score-btn" data-score="10">10</button>
+                </div>
+                <div id="scoreDescriptor" class="score-descriptor">Select a score above</div>
+            </div>
+
+            <button id="btnSubmitVote" class="btn-arcade" disabled>
+                <span>LOCK IN VOTE</span> &gt;
+            </button>
+            <div style="text-align: center; font-size: 11px; color: var(--text-muted);">
+                ⚠️ Only 1 member per team can vote. Choose wisely!
+            </div>
+        </div>
+
+        <!-- SUBSTATE 4: VOTE LOCKED IN -->
+        <div id="stateLocked" class="locked-card" style="display: none;">
+            <div class="locked-icon">🎮</div>
+            <h2 style="font-family: var(--font-pixel); font-size: 16px; color: var(--neon-green);">
+                VOTE LOCKED IN!
+            </h2>
+            <div class="locked-score-badge" id="lockedScoreDisplay">-- / 10</div>
+            <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+                Your team's vote has been recorded on the mainframe. Waiting for poll to conclude and next team selection.
+            </p>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer style="text-align: center; margin-top: 20px; font-size: 11px; color: var(--text-muted); letter-spacing: 1px;">
+        DIMENSIONS CLUB &bull; PITCH PLEASE
+    </footer>
+
+</div>
+
+<!-- Sound effects, Configuration & Team Application Logic -->
+<script src="js/config.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
