@@ -58,8 +58,23 @@ async def list_teams(
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin)
 ):
+    # Query which teams have had a poll in the current event
+    pitched_res = await db.execute(select(Poll.pitching_team_id).distinct())
+    pitched_ids = set(pitched_res.scalars().all())
+
     result = await db.execute(select(Team).order_by(Team.created_at.asc()))
-    return result.scalars().all()
+    teams = result.scalars().all()
+    output = []
+    for t in teams:
+        output.append(TeamResponse(
+            id=t.id,
+            name=t.name,
+            code=t.code,
+            is_active=t.is_active,
+            has_pitched=(t.id in pitched_ids),
+            created_at=t.created_at
+        ))
+    return output
 
 @router.patch("/teams/{team_id}/toggle", response_model=TeamResponse)
 async def toggle_team_active(
@@ -74,7 +89,18 @@ async def toggle_team_active(
     await db.commit()
     await db.refresh(team)
     await manager.broadcast_to_admin({"event": "teams_updated"})
-    return team
+    
+    # Check if pitched
+    pitched_res = await db.execute(select(Poll.pitching_team_id).where(Poll.pitching_team_id == team.id))
+    has_pitched = bool(pitched_res.scalars().first())
+    return TeamResponse(
+        id=team.id,
+        name=team.name,
+        code=team.code,
+        is_active=team.is_active,
+        has_pitched=has_pitched,
+        created_at=team.created_at
+    )
 
 @router.delete("/teams/{team_id}")
 async def delete_team(
@@ -95,9 +121,18 @@ async def get_wheel_teams(
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin)
 ):
-    result = await db.execute(select(Team).where(Team.is_active == True).order_by(Team.name.asc()))
+    # Only active teams that have NOT pitched yet can be on the wheel
+    pitched_res = await db.execute(select(Poll.pitching_team_id).distinct())
+    pitched_ids = set(pitched_res.scalars().all())
+
+    result = await db.execute(
+        select(Team)
+        .where(Team.is_active == True)
+        .order_by(Team.name.asc())
+    )
     teams = result.scalars().all()
-    return [{"id": t.id, "name": t.name, "code": t.code} for t in teams]
+    eligible = [t for t in teams if t.id not in pitched_ids]
+    return [{"id": t.id, "name": t.name, "code": t.code} for t in eligible]
 
 @router.post("/pitching/select")
 async def select_pitching_team(
@@ -193,9 +228,21 @@ async def extend_poll(
     )
     poll = active_result.scalars().first()
     if not poll:
-        raise HTTPException(status_code=400, detail="No active poll to extend")
+        # Fallback to the latest poll created if it was marked inactive when timer reached 0
+        recent_result = await db.execute(
+            select(Poll).options(selectinload(Poll.pitching_team)).order_by(Poll.created_at.desc())
+        )
+        poll = recent_result.scalars().first()
+        if not poll:
+            raise HTTPException(status_code=400, detail="No poll found to extend")
     
-    poll.ends_at = ensure_utc(poll.ends_at) + timedelta(seconds=payload.seconds)
+    poll.is_active = True
+    now = utc_now()
+    current_ends = ensure_utc(poll.ends_at)
+    # If poll time already completed (current_ends < now), add the seconds from NOW
+    # so teams get a full fresh duration (e.g. +15s)!
+    base_time = max(now, current_ends)
+    poll.ends_at = base_time + timedelta(seconds=payload.seconds)
     poll.duration_secs += payload.seconds
     await db.commit()
 

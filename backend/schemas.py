@@ -10,6 +10,7 @@ class TeamResponse(BaseModel):
     name: str
     code: str
     is_active: bool
+    has_pitched: bool = False
     created_at: Optional[datetime] = None
 
     class Config:

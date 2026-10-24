@@ -37,12 +37,6 @@ async def get_current_poll(
     ends_at_utc = ensure_utc(poll.ends_at)
     remaining = max(0.0, (ends_at_utc - now).total_seconds())
 
-    # Check if poll timer actually ended
-    if remaining <= 0:
-        poll.is_active = False
-        await db.commit()
-        return {"active": False, "poll": None}
-
     user_has_voted = False
     is_pitching = False
 
@@ -105,9 +99,10 @@ async def submit_vote(
     # 3. Check poll time validity (Server authoritative)
     now = utc_now()
     if now > ensure_utc(poll.ends_at):
-        poll.is_active = False
-        await db.commit()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Voting time has expired!")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Voting time is up! If the organizer extends the poll (+15s), you can submit then."
+        )
 
     # 4. Check if team is pitching team
     if team.id == poll.pitching_team_id:

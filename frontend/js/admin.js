@@ -346,6 +346,7 @@ function renderTeamsTable() {
                 <span class="status-badge ${t.is_active ? 'status-active' : 'status-paused'}">
                     ${t.is_active ? 'PLAYING' : 'PAUSED'}
                 </span>
+                ${t.has_pitched ? '<span class="status-badge" style="background: rgba(0, 229, 255, 0.15); color: var(--neon-cyan); border-color: var(--neon-cyan); margin-left: 6px;">🎤 PITCHED</span>' : ''}
             </td>
             <td style="text-align: right; white-space: nowrap;">
                 <button 
@@ -374,12 +375,26 @@ function updateOverviewStats() {
 }
 
 function updateWheelAndSelectOptions() {
+    // Only active teams that have NOT pitched yet can be spun on the wheel!
+    const eligibleWheelTeams = activeTeams.filter(t => !t.has_pitched);
+
     if (pitchWheel) {
-        pitchWheel.setTeams(activeTeams);
+        pitchWheel.setTeams(eligibleWheelTeams, activeTeams.length);
+    }
+
+    if (eligibleWheelTeams.length === 0 && activeTeams.length > 0) {
+        btnSpinWheel.disabled = true;
+        btnSpinWheel.innerHTML = '<span>🏆 ALL TEAMS HAVE PITCHED!</span>';
+    } else {
+        btnSpinWheel.disabled = false;
+        btnSpinWheel.innerHTML = '<span>🎡 SPIN THE WHEEL!</span>';
     }
 
     selectManualTeam.innerHTML = '<option value="">-- Select a Team --</option>' + 
-        activeTeams.map(t => `<option value="${t.id}">${escapeHtml(t.name)} (#${t.code})</option>`).join('');
+        activeTeams.map(t => {
+            const label = t.has_pitched ? `${escapeHtml(t.name)} (#${t.code}) [ALREADY PITCHED]` : `${escapeHtml(t.name)} (#${t.code})`;
+            return `<option value="${t.id}">${label}</option>`;
+        }).join('');
 }
 
 window.copyTeamCode = (code) => {
@@ -592,6 +607,7 @@ function onPollStartedUI(pollData) {
 
 function onPollEndedUI() {
     if (pollCountdownInterval) clearInterval(pollCountdownInterval);
+    pollCountdownInterval = null;
     pollStatusBadge.className = 'status-badge status-paused';
     pollStatusBadge.textContent = 'CONCLUDED';
     btnExtendPoll.disabled = true;
@@ -599,6 +615,7 @@ function onPollEndedUI() {
     adminPollTimer.textContent = '00:00';
     adminPollTimer.className = 'timer-digits';
     activePoll = null;
+    fetchTeams();
 }
 
 function startAdminCountdown(endsAtIso) {
@@ -624,7 +641,14 @@ function startAdminCountdown(endsAtIso) {
 
         if (diff <= 0) {
             clearInterval(pollCountdownInterval);
-            onPollEndedUI();
+            pollCountdownInterval = null;
+            adminPollTimer.textContent = '00:00';
+            adminPollTimer.className = 'timer-digits urgent';
+            pollStatusBadge.className = 'status-badge status-warning';
+            pollStatusBadge.textContent = "TIME'S UP (EXTEND OR END)";
+            // KEEP EXTEND AND END BUTTONS FULLY ACTIVE AFTER TIME COMPLETION!
+            btnExtendPoll.disabled = false;
+            btnEndPoll.disabled = false;
         }
     }
 
@@ -639,6 +663,14 @@ async function syncAdminPoll() {
         if (data.active && data.poll) {
             activePoll = data.poll;
             onPollStartedUI(data.poll);
+            if (data.poll.remaining_secs <= 0) {
+                adminPollTimer.textContent = '00:00';
+                adminPollTimer.className = 'timer-digits urgent';
+                pollStatusBadge.className = 'status-badge status-warning';
+                pollStatusBadge.textContent = "TIME'S UP (EXTEND OR END)";
+                btnExtendPoll.disabled = false;
+                btnEndPoll.disabled = false;
+            }
         } else {
             onPollEndedUI();
         }
@@ -750,6 +782,7 @@ window.deletePollResult = async (pollId, teamName) => {
         showNotice(`🗑️ Poll #${pollId} result deleted.`);
         if (window.arcadeSound) window.arcadeSound.click();
         await fetchResults();
+        await fetchTeams();
     } catch (e) {
         showNotice(e.message, true);
     }
@@ -820,16 +853,22 @@ function handleAdminWsMessage(msg) {
 
         case 'poll_extended':
             startAdminCountdown(msg.ends_at);
+            pollStatusBadge.className = 'status-badge status-active';
+            pollStatusBadge.textContent = 'ACTIVE (+EXTENDED)';
+            btnExtendPoll.disabled = false;
+            btnEndPoll.disabled = false;
             showNotice(`⏳ Poll extended by ${msg.added_seconds}s!`);
             break;
 
         case 'poll_ended':
             onPollEndedUI();
             fetchResults();
+            fetchTeams();
             break;
 
         case 'results_updated':
             fetchResults();
+            fetchTeams();
             break;
     }
 }

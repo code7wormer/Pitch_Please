@@ -311,10 +311,11 @@ function startCountdown(endsAtIso) {
         if (diff <= 0) {
             clearInterval(timerInterval);
             timerInterval = null;
+            pollCountdown.textContent = '00:00';
             if (window.arcadeSound) window.arcadeSound.countdownFinal();
             if (stateVoting.style.display !== 'none') {
                 btnSubmitVote.disabled = true;
-                btnSubmitVote.textContent = 'POLL CLOSED';
+                btnSubmitVote.textContent = "TIME'S UP (WAIT FOR EXTEND)";
             }
         }
     }
@@ -418,8 +419,29 @@ function handleWebSocketMessage(msg) {
         case 'poll_extended':
             if (currentPoll && currentPoll.id === msg.poll_id) {
                 currentPoll.ends_at = msg.ends_at;
-                startCountdown(msg.ends_at);
-                showTeamError(`⏳ Poll extended by +${msg.added_seconds}s!`);
+                
+                // 1. If this team has ALREADY voted, KEEP THEM LOCKED IN!
+                if (stateLocked.style.display === 'flex') {
+                    showTeamError(`⏳ Poll extended by +${msg.added_seconds}s! (Your team's vote is already recorded)`);
+                } else if (statePitchingNotice.style.display === 'flex') {
+                    // Pitching team stays on pitching notice
+                } else {
+                    // 2. Team has NOT voted yet: re-enable voting arena!
+                    hideAllSubstates();
+                    stateVoting.style.display = 'flex';
+                    startCountdown(msg.ends_at);
+                    if (selectedScore) {
+                        btnSubmitVote.disabled = false;
+                        btnSubmitVote.innerHTML = '<span>LOCK IN VOTE</span> &gt;';
+                    } else {
+                        btnSubmitVote.disabled = true;
+                        btnSubmitVote.innerHTML = '<span>LOCK IN VOTE</span> &gt;';
+                    }
+                    showTeamError(`⏳ Poll extended by +${msg.added_seconds}s! Cast your vote now!`);
+                    if (window.arcadeSound) window.arcadeSound.countdownTick();
+                }
+            } else {
+                syncCurrentPoll();
             }
             break;
 

@@ -35,8 +35,9 @@ class WheelOfPitch {
         this.draw();
     }
 
-    setTeams(teams) {
+    setTeams(teams, totalActiveCount = 0) {
         this.teams = teams;
+        this.totalActiveCount = totalActiveCount;
         this.draw();
     }
 
@@ -57,15 +58,16 @@ class WheelOfPitch {
             this.ctx.arc(cx, cy, radius, 0, Math.PI * 2);
             this.ctx.fillStyle = '#141822';
             this.ctx.fill();
-            this.ctx.strokeStyle = '#00ff66';
+            this.ctx.strokeStyle = this.totalActiveCount > 0 ? '#ffe600' : '#00ff66';
             this.ctx.lineWidth = 4;
             this.ctx.stroke();
 
-            this.ctx.fillStyle = '#8b9bb4';
-            this.ctx.font = '14px "Press Start 2P", monospace';
+            this.ctx.fillStyle = this.totalActiveCount > 0 ? '#ffe600' : '#8b9bb4';
+            this.ctx.font = '12px "Press Start 2P", monospace';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
-            this.ctx.fillText('ADD TEAMS FIRST', cx, cy);
+            const emptyText = this.totalActiveCount > 0 ? 'ALL TEAMS PITCHED!' : 'ADD TEAMS FIRST';
+            this.ctx.fillText(emptyText, cx, cy);
             this.ctx.restore();
             return;
         }
