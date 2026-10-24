@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy import text
 from sqlalchemy.orm import declarative_base
 
 from urllib.parse import urlsplit, urlunsplit, parse_qs, urlencode
@@ -69,19 +68,3 @@ async def init_db():
     # Auto-create tables on startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        
-        # Safe idempotent migrations for Round 2 columns
-        migration_statements = [
-            "ALTER TABLE teams ADD COLUMN is_promoted_round_2 BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE polls ADD COLUMN round_number INTEGER DEFAULT 1",
-            "ALTER TABLE polls ADD COLUMN pitching_team_b_id INTEGER REFERENCES teams(id) ON DELETE CASCADE",
-            "ALTER TABLE polls ADD COLUMN first_pitcher_id INTEGER REFERENCES teams(id) ON DELETE CASCADE",
-            "ALTER TABLE polls ADD COLUMN pitch_stage VARCHAR(30) DEFAULT 'single'",
-            "ALTER TABLE votes ADD COLUMN voted_for_team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE",
-            "ALTER TABLE votes ALTER COLUMN score DROP NOT NULL"
-        ]
-        for stmt in migration_statements:
-            try:
-                await conn.execute(text(stmt))
-            except Exception:
-                pass

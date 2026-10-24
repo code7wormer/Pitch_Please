@@ -58,17 +58,7 @@ const teamErrorBanner = document.getElementById('teamErrorBanner');
 
 const stateWaiting = document.getElementById('stateWaiting');
 const statePitchingNotice = document.getElementById('statePitchingNotice');
-const stateRound2BattlingNotice = document.getElementById('stateRound2BattlingNotice');
-const stateRound2Watching = document.getElementById('stateRound2Watching');
-const r2WatchTitle = document.getElementById('r2WatchTitle');
-const r2WatchSub = document.getElementById('r2WatchSub');
 const stateVoting = document.getElementById('stateVoting');
-const stateRound2Voting = document.getElementById('stateRound2Voting');
-const r2PollCountdown = document.getElementById('r2PollCountdown');
-const btnVoteTeamA = document.getElementById('btnVoteTeamA');
-const btnVoteTeamB = document.getElementById('btnVoteTeamB');
-const duelNameA = document.getElementById('duelNameA');
-const duelNameB = document.getElementById('duelNameB');
 const stateLocked = document.getElementById('stateLocked');
 
 const pollCountdown = document.getElementById('pollCountdown');
@@ -108,41 +98,26 @@ function bindEvents() {
     });
 
     teamCodeInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            handleLogin();
-        }
+        if (e.key === 'Enter') handleLogin();
     });
 
     btnSubmitLogin.addEventListener('click', handleLogin);
     btnLogout.addEventListener('click', handleLogout);
 
-    // Score button selection (Round 1)
+    // Score selection
     scoreBtns.forEach(btn => {
         btn.addEventListener('click', () => {
+            if (window.arcadeSound) window.arcadeSound.click();
             const score = parseInt(btn.dataset.score, 10);
             selectScore(score);
-            if (window.arcadeSound) window.arcadeSound.buttonClick();
         });
     });
 
     btnSubmitVote.addEventListener('click', submitVote);
-
-    // Round 2 Duel Voting Buttons
-    btnVoteTeamA.addEventListener('click', () => {
-        if (!currentPoll || !currentPoll.pitching_team_id) return;
-        submitRound2Vote(currentPoll.pitching_team_id, currentPoll.pitching_team_name);
-    });
-
-    btnVoteTeamB.addEventListener('click', () => {
-        if (!currentPoll || !currentPoll.pitching_team_b_id) return;
-        submitRound2Vote(currentPoll.pitching_team_b_id, currentPoll.pitching_team_b_name);
-    });
 }
 
-// Session Management
-async function checkSavedSession() {
-    const saved = localStorage.getItem('pitch_current_team');
+function checkSavedSession() {
+    const saved = localStorage.getItem('pitch_team_session');
     if (saved) {
         try {
             currentTeam = JSON.parse(saved);
@@ -151,7 +126,7 @@ async function checkSavedSession() {
             syncCurrentPoll();
             return;
         } catch (e) {
-            localStorage.removeItem('pitch_current_team');
+            localStorage.removeItem('pitch_team_session');
         }
     }
     showLoginView();
@@ -160,12 +135,13 @@ async function checkSavedSession() {
 async function handleLogin() {
     const code = teamCodeInput.value.trim();
     if (code.length !== 6) {
-        showLoginError('Please enter a valid 6-digit team code.');
+        showLoginError('Please enter a full 6-digit team code.');
+        if (window.arcadeSound) window.arcadeSound.errorBuzz();
         return;
     }
 
     btnSubmitLogin.disabled = true;
-    btnSubmitLogin.textContent = 'CONNECTING...';
+    btnSubmitLogin.innerText = 'AUTHENTICATING...';
 
     try {
         const res = await fetch(`${API_BASE}/api/auth/login`, {
@@ -176,15 +152,15 @@ async function handleLogin() {
 
         const data = await res.json();
         if (!res.ok) {
-            throw new Error(data.detail || 'Invalid team code.');
+            throw new Error(data.detail || 'Invalid code.');
         }
 
         currentTeam = data;
-        localStorage.setItem('pitch_current_team', JSON.stringify(data));
+        localStorage.setItem('pitch_team_session', JSON.stringify(currentTeam));
+        if (window.arcadeSound) window.arcadeSound.voteSuccess();
         showTeamView();
         initTeamWebSocket();
         syncCurrentPoll();
-        if (window.arcadeSound) window.arcadeSound.gameStart();
     } catch (err) {
         showLoginError(err.message);
         if (window.arcadeSound) window.arcadeSound.errorBuzz();
@@ -195,14 +171,11 @@ async function handleLogin() {
 }
 
 function handleLogout() {
-    if (confirm('Are you sure you want to exit and disconnect on this device?')) {
-        if (teamWs) {
-            try { teamWs.close(); } catch (e) {}
-        }
-        localStorage.removeItem('pitch_current_team');
-        currentTeam = null;
-        currentPoll = null;
+    if (confirm('Exit this team session? You can log back in anytime with your 6-digit code.')) {
+        if (teamWs) teamWs.close();
         if (timerInterval) clearInterval(timerInterval);
+        localStorage.removeItem('pitch_team_session');
+        currentTeam = null;
         showLoginView();
     }
 }
@@ -239,14 +212,11 @@ function showTeamError(msg) {
 function hideAllSubstates() {
     stateWaiting.style.display = 'none';
     statePitchingNotice.style.display = 'none';
-    stateRound2BattlingNotice.style.display = 'none';
-    stateRound2Watching.style.display = 'none';
     stateVoting.style.display = 'none';
-    stateRound2Voting.style.display = 'none';
     stateLocked.style.display = 'none';
 }
 
-// Score Selector (Round 1)
+// Score Selector
 function selectScore(score) {
     selectedScore = score;
     scoreBtns.forEach(b => {
@@ -267,7 +237,7 @@ function resetScoreSelection() {
     btnSubmitVote.disabled = true;
 }
 
-// Vote Submission (Round 1)
+// Vote Submission
 async function submitVote() {
     if (!selectedScore || !currentPoll) return;
 
@@ -287,13 +257,14 @@ async function submitVote() {
         const data = await res.json();
         if (!res.ok) {
             if (res.status === 409) {
+                // Already voted by someone on the team
                 lockVoteView(selectedScore || '--', 'A member of your team has already voted!');
                 return;
             }
             throw new Error(data.detail || 'Failed to submit vote.');
         }
 
-        lockVoteView(`${selectedScore} / 10`);
+        lockVoteView(selectedScore);
         if (window.arcadeSound) window.arcadeSound.voteSuccess();
     } catch (err) {
         showTeamError(err.message);
@@ -303,54 +274,18 @@ async function submitVote() {
     }
 }
 
-// Vote Submission (Round 2 1v1 Duel)
-async function submitRound2Vote(votedForTeamId, votedTeamName) {
-    if (!currentPoll) return;
-
-    btnVoteTeamA.disabled = true;
-    btnVoteTeamB.disabled = true;
-
-    try {
-        const res = await fetch(`${API_BASE}/api/vote`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-team-code': currentTeam.code
-            },
-            body: JSON.stringify({ voted_for_team_id: votedForTeamId })
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-            if (res.status === 409) {
-                lockVoteView(`VOTED`, 'A member of your team has already voted!');
-                return;
-            }
-            throw new Error(data.detail || 'Failed to submit vote.');
-        }
-
-        lockVoteView(`FOR ${votedTeamName}`);
-        if (window.arcadeSound) window.arcadeSound.voteSuccess();
-    } catch (err) {
-        showTeamError(err.message);
-        if (window.arcadeSound) window.arcadeSound.errorBuzz();
-        btnVoteTeamA.disabled = false;
-        btnVoteTeamB.disabled = false;
-    }
-}
-
-function lockVoteView(scoreBadge, customMsg) {
+function lockVoteView(score, customMsg) {
     if (timerInterval) clearInterval(timerInterval);
     hideAllSubstates();
     stateLocked.style.display = 'flex';
-    lockedScoreDisplay.textContent = scoreBadge;
+    lockedScoreDisplay.textContent = `${score} / 10`;
     if (customMsg) {
         showTeamError(customMsg);
     }
 }
 
 // Countdown Timer
-function startCountdown(endsAtIso, timerEl = pollCountdown) {
+function startCountdown(endsAtIso) {
     if (timerInterval) clearInterval(timerInterval);
 
     const targetTime = new Date(endsAtIso).getTime();
@@ -362,21 +297,21 @@ function startCountdown(endsAtIso, timerEl = pollCountdown) {
 
         const mins = Math.floor(totalSecs / 60);
         const secs = totalSecs % 60;
-        timerEl.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        pollCountdown.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 
         if (totalSecs <= 5) {
-            timerEl.className = 'timer-digits urgent';
+            pollCountdown.className = 'timer-digits urgent';
             if (totalSecs > 0 && window.arcadeSound) window.arcadeSound.countdownTick();
         } else if (totalSecs <= 15) {
-            timerEl.className = 'timer-digits warning';
+            pollCountdown.className = 'timer-digits warning';
         } else {
-            timerEl.className = 'timer-digits';
+            pollCountdown.className = 'timer-digits';
         }
 
         if (diff <= 0) {
             clearInterval(timerInterval);
             timerInterval = null;
-            timerEl.textContent = '00:00';
+            pollCountdown.textContent = '00:00';
             if (window.arcadeSound) window.arcadeSound.countdownFinal();
             if (stateVoting.style.display !== 'none') {
                 btnSubmitVote.disabled = true;
@@ -411,50 +346,25 @@ async function syncCurrentPoll() {
 function applyPollState(poll) {
     currentPoll = poll;
 
-    const isRound2 = (poll.round_number === 2 || poll.pitching_team_b_id !== null);
-
     if (poll.is_pitching_team) {
-        // You are in the arena / pitching!
+        // You are pitching!
         hideAllSubstates();
-        if (isRound2) {
-            stateRound2BattlingNotice.style.display = 'block';
-        } else {
-            statePitchingNotice.style.display = 'flex';
-        }
+        statePitchingNotice.style.display = 'flex';
         return;
     }
 
     if (poll.user_has_voted) {
         // Already voted
-        lockVoteView('LOCKED IN');
+        lockVoteView('LOCKED');
         return;
     }
 
-    if (isRound2) {
-        hideAllSubstates();
-        if (poll.pitch_stage === 'voting_live' || poll.is_active) {
-            // Live 1v1 audience voting!
-            stateRound2Voting.style.display = 'flex';
-            duelNameA.textContent = poll.pitching_team_name;
-            duelNameB.textContent = poll.pitching_team_b_name || 'TEAM B';
-            btnVoteTeamA.disabled = false;
-            btnVoteTeamB.disabled = false;
-            startCountdown(poll.ends_at, r2PollCountdown);
-        } else {
-            // Watching pitches before voting opens
-            stateRound2Watching.style.display = 'flex';
-            r2WatchTitle.textContent = (poll.pitch_stage === 'pitch1' ? `${poll.pitching_team_name} IS PITCHING...` : `${poll.pitching_team_b_name || 'Team 2'} IS PITCHING...`);
-            r2WatchSub.textContent = "Listen closely! Once both teams have pitched, 1v1 voting will open on your screen.";
-        }
-        return;
-    }
-
-    // Round 1 active voting state
+    // Active voting state
     hideAllSubstates();
     pitchingTeamName.textContent = poll.pitching_team_name;
     resetScoreSelection();
     stateVoting.style.display = 'flex';
-    startCountdown(poll.ends_at, pollCountdown);
+    startCountdown(poll.ends_at);
 }
 
 // WebSocket Connection
@@ -502,13 +412,7 @@ function initTeamWebSocket() {
 function handleWebSocketMessage(msg) {
     switch (msg.event) {
         case 'poll_started':
-        case 'round2_voting_started':
             if (window.arcadeSound) window.arcadeSound.countdownTick();
-            syncCurrentPoll();
-            break;
-
-        case 'round2_battle_locked':
-        case 'round2_stage_updated':
             syncCurrentPoll();
             break;
 
@@ -516,21 +420,22 @@ function handleWebSocketMessage(msg) {
             if (currentPoll && currentPoll.id === msg.poll_id) {
                 currentPoll.ends_at = msg.ends_at;
                 
-                // If already voted, keep locked in
+                // 1. If this team has ALREADY voted, KEEP THEM LOCKED IN!
                 if (stateLocked.style.display === 'flex') {
-                    showTeamError(`⏳ Poll extended by +${msg.added_seconds}s! (Your vote is already recorded)`);
-                } else if (statePitchingNotice.style.display === 'flex' || stateRound2BattlingNotice.style.display === 'block') {
-                    // Battling teams stay locked
+                    showTeamError(`⏳ Poll extended by +${msg.added_seconds}s! (Your team's vote is already recorded)`);
+                } else if (statePitchingNotice.style.display === 'flex') {
+                    // Pitching team stays on pitching notice
                 } else {
-                    if (currentPoll.round_number === 2 || currentPoll.pitching_team_b_id) {
-                        hideAllSubstates();
-                        stateRound2Voting.style.display = 'flex';
-                        startCountdown(msg.ends_at, r2PollCountdown);
+                    // 2. Team has NOT voted yet: re-enable voting arena!
+                    hideAllSubstates();
+                    stateVoting.style.display = 'flex';
+                    startCountdown(msg.ends_at);
+                    if (selectedScore) {
+                        btnSubmitVote.disabled = false;
+                        btnSubmitVote.innerHTML = '<span>LOCK IN VOTE</span> &gt;';
                     } else {
-                        hideAllSubstates();
-                        stateVoting.style.display = 'flex';
-                        startCountdown(msg.ends_at, pollCountdown);
-                        btnSubmitVote.disabled = !selectedScore;
+                        btnSubmitVote.disabled = true;
+                        btnSubmitVote.innerHTML = '<span>LOCK IN VOTE</span> &gt;';
                     }
                     showTeamError(`⏳ Poll extended by +${msg.added_seconds}s! Cast your vote now!`);
                     if (window.arcadeSound) window.arcadeSound.countdownTick();
@@ -541,7 +446,6 @@ function handleWebSocketMessage(msg) {
             break;
 
         case 'poll_ended':
-        case 'round2_voting_ended':
             if (timerInterval) clearInterval(timerInterval);
             hideAllSubstates();
             stateWaiting.style.display = 'flex';
@@ -549,11 +453,11 @@ function handleWebSocketMessage(msg) {
             break;
 
         case 'already_voted':
-            lockVoteView('LOCKED', msg.message);
+            lockVoteView('--', msg.message);
             break;
 
         case 'vote_confirmed':
-            lockVoteView(msg.score ? `${msg.score} / 10` : 'VOTE LOCKED');
+            lockVoteView(msg.score);
             break;
     }
 }
