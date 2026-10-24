@@ -102,6 +102,89 @@ const btnExportExcel = document.getElementById('btnExportExcel');
 const btnRefreshFinalize = document.getElementById('btnRefreshFinalize');
 const finalizeTableBody = document.getElementById('finalizeTableBody');
 
+// Round 2 Tab elements
+const promotionCountBadge = document.getElementById('promotionCountBadge');
+const promotedCountNum = document.getElementById('promotedCountNum');
+const btnLockPromotedTeams = document.getElementById('btnLockPromotedTeams');
+const btnRefreshR2Teams = document.getElementById('btnRefreshR2Teams');
+const r2PromotionTableBody = document.getElementById('r2PromotionTableBody');
+
+const selectTeamA = document.getElementById('selectTeamA');
+const selectTeamB = document.getElementById('selectTeamB');
+const btnRollFirstPitcher = document.getElementById('btnRollFirstPitcher');
+const firstPitcherAnnouncement = document.getElementById('firstPitcherAnnouncement');
+const btnLockInBattle = document.getElementById('btnLockInBattle');
+
+const projectorBattleArena = document.getElementById('projectorBattleArena');
+const battleArenaCanvas = document.getElementById('battleArenaCanvas');
+const battleBgVideo = document.getElementById('battleBgVideo');
+const arenaLiveStatusBadge = document.getElementById('arenaLiveStatusBadge');
+
+const stageStep1 = document.getElementById('stageStep1');
+const stageStep2 = document.getElementById('stageStep2');
+const stageStep3 = document.getElementById('stageStep3');
+const stageStep4 = document.getElementById('stageStep4');
+
+const fighterCardA = document.getElementById('fighterCardA');
+const fighterCardB = document.getElementById('fighterCardB');
+const arenaTeamAName = document.getElementById('arenaTeamAName');
+const arenaTeamBName = document.getElementById('arenaTeamBName');
+const arenaTeamAStatus = document.getElementById('arenaTeamAStatus');
+const arenaTeamBStatus = document.getElementById('arenaTeamBStatus');
+const arenaVotesDisplayA = document.getElementById('arenaVotesDisplayA');
+const arenaVotesDisplayB = document.getElementById('arenaVotesDisplayB');
+const arenaCountdownTimer = document.getElementById('arenaCountdownTimer');
+const arenaSubstatusText = document.getElementById('arenaSubstatusText');
+
+const meterFillA = document.getElementById('meterFillA');
+const meterFillB = document.getElementById('meterFillB');
+
+const controlsPitch1 = document.getElementById('controlsPitch1');
+const controlsPitch2 = document.getElementById('controlsPitch2');
+const controlsOpenVoting = document.getElementById('controlsOpenVoting');
+const controlsVotingLive = document.getElementById('controlsVotingLive');
+const controlsJudgement = document.getElementById('controlsJudgement');
+
+const pitch1SpeakerName = document.getElementById('pitch1SpeakerName');
+const pitch2SpeakerName = document.getElementById('pitch2SpeakerName');
+const btnFinishPitch1 = document.getElementById('btnFinishPitch1');
+const btnFinishPitch2 = document.getElementById('btnFinishPitch2');
+
+const selectBattleDuration = document.getElementById('selectBattleDuration');
+const btnOpenVotingNow = document.getElementById('btnOpenVotingNow');
+const btnExtendBattleTimer = document.getElementById('btnExtendBattleTimer');
+const btnEndBattleVoting = document.getElementById('btnEndBattleVoting');
+
+const judgeInputNameA = document.getElementById('judgeInputNameA');
+const judgeInputNameB = document.getElementById('judgeInputNameB');
+const calcAudScoreA = document.getElementById('calcAudScoreA');
+const calcAudScoreB = document.getElementById('calcAudScoreB');
+const weightAudA = document.getElementById('weightAudA');
+const weightAudB = document.getElementById('weightAudB');
+const inputJudgeA = document.getElementById('inputJudgeA');
+const inputJudgeB = document.getElementById('inputJudgeB');
+const calcFinalA = document.getElementById('calcFinalA');
+const calcFinalB = document.getElementById('calcFinalB');
+const btnDeclareWinner = document.getElementById('btnDeclareWinner');
+
+const arenaWinnerSpotlight = document.getElementById('arenaWinnerSpotlight');
+const winnerTeamBanner = document.getElementById('winnerTeamBanner');
+const winnerScoreSummary = document.getElementById('winnerScoreSummary');
+const btnResetBattleArena = document.getElementById('btnResetBattleArena');
+
+const inputBattleVideoUrl = document.getElementById('inputBattleVideoUrl');
+const btnApplyBattleVideo = document.getElementById('btnApplyBattleVideo');
+const btnToggleVideoVsCanvas = document.getElementById('btnToggleVideoVsCanvas');
+const btnCopyGeminiPrompt = document.getElementById('btnCopyGeminiPrompt');
+const geminiVideoPromptText = document.getElementById('geminiVideoPromptText');
+
+// Round 2 State
+let r2PromotedIds = new Set();
+let r2SelectedFirstPitcherId = null;
+let currentRound2Battle = null;
+let r2BattleCountdownInterval = null;
+let battleCanvasAnimId = null;
+
 // API Modal elements
 const btnConfigApi = document.getElementById('btnConfigApi');
 const apiUrlModal = document.getElementById('apiUrlModal');
@@ -216,6 +299,30 @@ function bindEvents() {
     // Finalize Results & Export
     if (btnRefreshFinalize) btnRefreshFinalize.addEventListener('click', loadFinalizeTable);
     if (btnExportExcel) btnExportExcel.addEventListener('click', exportFinalResultsToExcel);
+
+    // Round 2 Promotion & Battles
+    if (btnRefreshR2Teams) btnRefreshR2Teams.addEventListener('click', loadRound2PromotionTeams);
+    if (btnLockPromotedTeams) btnLockPromotedTeams.addEventListener('click', handleLockPromotedTeams);
+
+    if (selectTeamA) selectTeamA.addEventListener('change', updateMatchmakerPreviews);
+    if (selectTeamB) selectTeamB.addEventListener('change', updateMatchmakerPreviews);
+    if (btnRollFirstPitcher) btnRollFirstPitcher.addEventListener('click', rollRandomFirstPitcher);
+    if (btnLockInBattle) btnLockInBattle.addEventListener('click', handleLockInBattle);
+
+    if (btnFinishPitch1) btnFinishPitch1.addEventListener('click', () => advanceBattleStage('pitch2'));
+    if (btnFinishPitch2) btnFinishPitch2.addEventListener('click', () => advanceBattleStage('voting_ready'));
+    if (btnOpenVotingNow) btnOpenVotingNow.addEventListener('click', handleOpenBattleVoting);
+    if (btnExtendBattleTimer) btnExtendBattleTimer.addEventListener('click', handleExtendBattleTimer);
+    if (btnEndBattleVoting) btnEndBattleVoting.addEventListener('click', handleEndBattleVoting);
+
+    if (inputJudgeA) inputJudgeA.addEventListener('input', calculateLiveJudgement);
+    if (inputJudgeB) inputJudgeB.addEventListener('input', calculateLiveJudgement);
+    if (btnDeclareWinner) btnDeclareWinner.addEventListener('click', handleDeclareWinner);
+    if (btnResetBattleArena) btnResetBattleArena.addEventListener('click', resetBattleArena);
+
+    if (btnCopyGeminiPrompt) btnCopyGeminiPrompt.addEventListener('click', copyGeminiPrompt);
+    if (btnApplyBattleVideo) btnApplyBattleVideo.addEventListener('click', applyBattleVideo);
+    if (btnToggleVideoVsCanvas) btnToggleVideoVsCanvas.addEventListener('click', toggleVideoVsCanvas);
 }
 
 function switchTab(tabId) {
@@ -237,6 +344,11 @@ function switchTab(tabId) {
     }
     if (tabId === 'tabFinalize') {
         loadFinalizeTable();
+    }
+    if (tabId === 'tabRound2') {
+        loadRound2PromotionTeams();
+        syncCurrentRound2Battle();
+        initBattleCanvas();
     }
 }
 
@@ -273,6 +385,70 @@ async function verifyAndLoad() {
         adminAuthError.textContent = err.message;
         adminAuthError.style.display = 'block';
         adminAuthModal.style.display = 'flex';
+    }
+}
+
+function initAdminWebSocket() {
+    if (adminWs) {
+        try { adminWs.close(); } catch (e) {}
+    }
+    const wsUrl = `${WS_BASE}/ws/admin`;
+    adminWs = new WebSocket(wsUrl);
+
+    adminWs.onopen = () => {
+        if (adminConnDot) adminConnDot.classList.remove('offline');
+        if (adminWsStatus) adminWsStatus.textContent = 'ONLINE';
+        adminWs._ping = setInterval(() => {
+            if (adminWs.readyState === WebSocket.OPEN) adminWs.send('ping');
+        }, 20000);
+    };
+
+    adminWs.onclose = () => {
+        if (adminConnDot) adminConnDot.classList.add('offline');
+        if (adminWsStatus) adminWsStatus.textContent = 'OFFLINE';
+        if (adminWs._ping) clearInterval(adminWs._ping);
+        setTimeout(() => {
+            if (adminKey) initAdminWebSocket();
+        }, 3000);
+    };
+
+    adminWs.onerror = () => {
+        if (adminConnDot) adminConnDot.classList.add('offline');
+    };
+
+    adminWs.onmessage = (event) => {
+        if (event.data === 'pong') return;
+        try {
+            const data = JSON.parse(event.data);
+            handleAdminWsMessage(data);
+        } catch (e) {}
+    };
+}
+
+function handleAdminWsMessage(msg) {
+    switch (msg.event) {
+        case 'vote_cast':
+            if (activePoll && activePoll.id === msg.poll_id) {
+                if (liveVoteCount) liveVoteCount.textContent = msg.total_votes;
+            }
+            if (currentRound2Battle && currentRound2Battle.id === msg.poll_id) {
+                updateRound2VoteMeters(msg.votes_team_a, msg.votes_team_b, msg.total_votes);
+            }
+            break;
+        case 'teams_updated':
+            fetchTeams();
+            loadRound2PromotionTeams();
+            break;
+        case 'results_updated':
+            fetchResults();
+            break;
+        case 'round2_battle_locked':
+        case 'round2_stage_updated':
+        case 'round2_voting_started':
+        case 'round2_voting_ended':
+        case 'round2_winner_declared':
+            syncCurrentRound2Battle();
+            break;
     }
 }
 
@@ -1173,4 +1349,755 @@ function exportFinalResultsToExcel() {
         showNotice("📥 Results exported as CSV!");
     }
 }
+
+
+// =========================================================================
+// ROUND 2: PROMOTION, MATCHMAKER & 1v1 BATTLE ENGINE
+// =========================================================================
+
+async function loadRound2PromotionTeams() {
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/round2/teams`, {
+            headers: { 'x-admin-key': adminKey }
+        });
+        if (!res.ok) throw new Error('Failed to load Round 2 teams');
+        const teams = await res.json();
+
+        r2PromotedIds.clear();
+        teams.forEach(t => {
+            if (t.is_promoted) r2PromotedIds.add(t.id);
+        });
+
+        renderRound2PromotionTable(teams);
+        updatePromotedCountBadge();
+        updateRound2MatchmakerDropdowns(teams.filter(t => r2PromotedIds.has(t.id)));
+    } catch (e) {
+        showNotice(e.message, true);
+    }
+}
+
+function renderRound2PromotionTable(teams) {
+    if (!teams || teams.length === 0) {
+        r2PromotionTableBody.innerHTML = `
+            <tr>
+                <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                    No teams available for Round 2.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    r2PromotionTableBody.innerHTML = teams.map(t => {
+        const isChecked = r2PromotedIds.has(t.id);
+        return `
+            <tr style="${isChecked ? 'background: rgba(0, 255, 102, 0.04);' : ''}">
+                <td style="text-align: center;">
+                    <input 
+                        type="checkbox" 
+                        class="checkbox-consider" 
+                        data-team-id="${t.id}"
+                        ${isChecked ? 'checked' : ''}
+                        onchange="toggleR2PromoteTeam(${t.id}, this.checked)"
+                    >
+                </td>
+                <td>
+                    <strong style="color: #fff; font-size: 14px;">${escapeHtml(t.name)}</strong>
+                    <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">#${t.code}</span>
+                </td>
+                <td style="text-align: center; font-family: var(--font-pixel); font-size: 12px; color: var(--neon-cyan);">
+                    ${t.round1_avg ? t.round1_avg.toFixed(2) : '0.00'} / 10
+                </td>
+                <td style="text-align: right;">
+                    <span class="round2-promotion-badge ${isChecked ? 'valid' : 'invalid'}" style="font-size: 9px;">
+                        ${isChecked ? '⭐ PROMOTED' : 'UNSELECTED'}
+                    </span>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+window.toggleR2PromoteTeam = function(teamId, isChecked) {
+    if (isChecked) {
+        r2PromotedIds.add(teamId);
+    } else {
+        r2PromotedIds.delete(teamId);
+    }
+    updatePromotedCountBadge();
+    loadRound2PromotionTeams();
+};
+
+function updatePromotedCountBadge() {
+    const count = r2PromotedIds.size;
+    promotedCountNum.textContent = count;
+    const isEven = (count >= 2 && count % 2 === 0);
+
+    if (isEven) {
+        promotionCountBadge.className = 'round2-promotion-badge valid';
+        promotionCountBadge.innerHTML = `SELECTED: <span id="promotedCountNum">${count}</span> (VALID EVEN NUMBER) ✅`;
+        btnLockPromotedTeams.disabled = false;
+        btnLockPromotedTeams.style.opacity = '1';
+    } else {
+        promotionCountBadge.className = 'round2-promotion-badge invalid';
+        promotionCountBadge.innerHTML = `SELECTED: <span id="promotedCountNum">${count}</span> (EVEN NUMBER REQUIRED) ⚠️`;
+        btnLockPromotedTeams.disabled = (count === 0);
+        btnLockPromotedTeams.style.opacity = isEven ? '1' : '0.7';
+    }
+}
+
+async function handleLockPromotedTeams() {
+    const count = r2PromotedIds.size;
+    if (count < 2 || count % 2 !== 0) {
+        showNotice(`⚠️ Exactly an even number of teams is required (Selected: ${count}). Please select 2, 4, 6, 8... teams.`, true);
+        return;
+    }
+
+    btnLockPromotedTeams.disabled = true;
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/round2/promote`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-admin-key': adminKey
+            },
+            body: JSON.stringify({ team_ids: Array.from(r2PromotedIds) })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to lock promoted teams');
+
+        showNotice(`🔒 Successfully locked ${count} teams for Round 2 battles!`);
+        if (window.arcadeSound) window.arcadeSound.gameStart();
+        await loadRound2PromotionTeams();
+    } catch (e) {
+        showNotice(e.message, true);
+    } finally {
+        btnLockPromotedTeams.disabled = false;
+    }
+}
+
+function updateRound2MatchmakerDropdowns(promotedTeams) {
+    const currentA = selectTeamA.value;
+    const currentB = selectTeamB.value;
+
+    selectTeamA.innerHTML = '<option value="">-- Select Team A --</option>' + 
+        promotedTeams.map(t => `<option value="${t.id}">${escapeHtml(t.name)} (#${t.code})</option>`).join('');
+
+    selectTeamB.innerHTML = '<option value="">-- Select Team B --</option>' + 
+        promotedTeams.map(t => `<option value="${t.id}">${escapeHtml(t.name)} (#${t.code})</option>`).join('');
+
+    if (currentA) selectTeamA.value = currentA;
+    if (currentB) selectTeamB.value = currentB;
+
+    updateMatchmakerPreviews();
+}
+
+function updateMatchmakerPreviews() {
+    const teamAId = parseInt(selectTeamA.value, 10);
+    const teamBId = parseInt(selectTeamB.value, 10);
+
+    const teamA = allTeams.find(t => t.id === teamAId);
+    const teamB = allTeams.find(t => t.id === teamBId);
+
+    if (teamAId && teamBId && teamAId === teamBId) {
+        showNotice('⚠️ You cannot match a team against itself!', true);
+        selectTeamB.value = '';
+        return;
+    }
+
+    if (teamA) arenaTeamAName.textContent = teamA.name;
+    else arenaTeamAName.textContent = 'SELECT TEAM A';
+
+    if (teamB) arenaTeamBName.textContent = teamB.name;
+    else arenaTeamBName.textContent = 'SELECT TEAM B';
+
+    r2SelectedFirstPitcherId = null;
+    firstPitcherAnnouncement.textContent = 'CLICK RANDOM SELECTOR TO DECIDE WHO TAKES THE STAGE FIRST';
+    firstPitcherAnnouncement.style.color = 'var(--neon-yellow)';
+}
+
+function rollRandomFirstPitcher() {
+    const teamAId = parseInt(selectTeamA.value, 10);
+    const teamBId = parseInt(selectTeamB.value, 10);
+
+    if (!teamAId || !teamBId) {
+        showNotice('Please select both Team A and Team B before rolling!', true);
+        return;
+    }
+
+    const teamA = allTeams.find(t => t.id === teamAId);
+    const teamB = allTeams.find(t => t.id === teamBId);
+    if (!teamA || !teamB) return;
+
+    btnRollFirstPitcher.disabled = true;
+    let ticks = 0;
+    const maxTicks = 18;
+
+    const rollInterval = setInterval(() => {
+        ticks++;
+        const isA = (ticks % 2 === 0);
+        firstPitcherAnnouncement.textContent = `ROLLING... 👉 ${isA ? teamA.name : teamB.name}`;
+        if (window.arcadeSound) window.arcadeSound.countdownTick();
+
+        if (ticks >= maxTicks) {
+            clearInterval(rollInterval);
+            const winner = (Math.random() < 0.5) ? teamA : teamB;
+            r2SelectedFirstPitcherId = winner.id;
+            firstPitcherAnnouncement.textContent = `🎤 ${winner.name.toUpperCase()} PITCHES FIRST!`;
+            firstPitcherAnnouncement.style.color = 'var(--neon-green)';
+            if (window.arcadeSound) window.arcadeSound.winnerFanfare();
+            btnRollFirstPitcher.disabled = false;
+        }
+    }, 100);
+}
+
+async function handleLockInBattle() {
+    const teamAId = parseInt(selectTeamA.value, 10);
+    const teamBId = parseInt(selectTeamB.value, 10);
+
+    if (!teamAId || !teamBId) {
+        showNotice('Please select both Team A and Team B for the battle!', true);
+        return;
+    }
+
+    if (!r2SelectedFirstPitcherId) {
+        r2SelectedFirstPitcherId = teamAId; // default fallback if unrolled
+    }
+
+    btnLockInBattle.disabled = true;
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/round2/battle/start`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-admin-key': adminKey
+            },
+            body: JSON.stringify({
+                team_a_id: teamAId,
+                team_b_id: teamBId,
+                first_pitcher_id: r2SelectedFirstPitcherId
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to start battle');
+
+        currentRound2Battle = data;
+        showNotice(`⚔️ 1v1 Battle locked between ${data.team_a.name} and ${data.team_b.name}!`);
+        if (window.arcadeSound) window.arcadeSound.gameStart();
+
+        applyRound2BattleUI(data);
+        projectorBattleArena.scrollIntoView({ behavior: 'smooth' });
+    } catch (e) {
+        showNotice(e.message, true);
+    } finally {
+        btnLockInBattle.disabled = false;
+    }
+}
+
+function applyRound2BattleUI(battle) {
+    currentRound2Battle = battle;
+    arenaLiveStatusBadge.textContent = '1v1 BATTLE IN PROGRESS';
+    arenaLiveStatusBadge.style.color = 'var(--neon-green)';
+    arenaLiveStatusBadge.style.borderColor = 'var(--neon-green)';
+
+    arenaTeamAName.textContent = battle.team_a.name;
+    arenaTeamBName.textContent = battle.team_b.name;
+
+    const firstPitcherId = battle.first_pitcher_id || battle.team_a.id;
+    const isFirstPitcherA = (firstPitcherId === battle.team_a.id);
+
+    const firstPitcherName = isFirstPitcherA ? battle.team_a.name : battle.team_b.name;
+    const secondPitcherName = isFirstPitcherA ? battle.team_b.name : battle.team_a.name;
+
+    // Reset breadcrumb steps
+    [stageStep1, stageStep2, stageStep3, stageStep4].forEach(s => s.className = 'stage-step');
+    [controlsPitch1, controlsPitch2, controlsOpenVoting, controlsVotingLive, controlsJudgement, arenaWinnerSpotlight].forEach(c => c.style.display = 'none');
+
+    // Stage progression
+    const stage = battle.pitch_stage || 'pitch1';
+
+    if (stage === 'pitch1') {
+        stageStep1.className = 'stage-step active';
+        controlsPitch1.style.display = 'flex';
+        pitch1SpeakerName.textContent = firstPitcherName;
+
+        fighterCardA.className = isFirstPitcherA ? 'fighter-card team-a active-pitcher' : 'fighter-card team-a';
+        fighterCardB.className = !isFirstPitcherA ? 'fighter-card team-b active-pitcher' : 'fighter-card team-b';
+
+        arenaTeamAStatus.textContent = isFirstPitcherA ? '🎤 PITCHING FIRST' : 'WAITING FOR TURN';
+        arenaTeamBStatus.textContent = !isFirstPitcherA ? '🎤 PITCHING FIRST' : 'WAITING FOR TURN';
+        arenaSubstatusText.textContent = `${firstPitcherName} is pitching on stage`;
+    } else if (stage === 'pitch2') {
+        stageStep1.className = 'stage-step completed';
+        stageStep2.className = 'stage-step active';
+        controlsPitch2.style.display = 'flex';
+        pitch2SpeakerName.textContent = secondPitcherName;
+
+        fighterCardA.className = !isFirstPitcherA ? 'fighter-card team-a active-pitcher' : 'fighter-card team-a';
+        fighterCardB.className = isFirstPitcherA ? 'fighter-card team-b active-pitcher' : 'fighter-card team-b';
+
+        arenaTeamAStatus.textContent = !isFirstPitcherA ? '🎤 PITCHING NOW' : 'PITCH FINISHED';
+        arenaTeamBStatus.textContent = isFirstPitcherA ? '🎤 PITCHING NOW' : 'PITCH FINISHED';
+        arenaSubstatusText.textContent = `${secondPitcherName} is pitching on stage`;
+    } else if (stage === 'voting_ready') {
+        stageStep1.className = 'stage-step completed';
+        stageStep2.className = 'stage-step completed';
+        stageStep3.className = 'stage-step active';
+        controlsOpenVoting.style.display = 'flex';
+
+        fighterCardA.className = 'fighter-card team-a';
+        fighterCardB.className = 'fighter-card team-b';
+
+        arenaTeamAStatus.textContent = 'PITCH FINISHED';
+        arenaTeamBStatus.textContent = 'PITCH FINISHED';
+        arenaSubstatusText.textContent = 'Both pitches complete! Ready for audience vote.';
+    } else if (stage === 'voting_live' || battle.is_active) {
+        stageStep1.className = 'stage-step completed';
+        stageStep2.className = 'stage-step completed';
+        stageStep3.className = 'stage-step active';
+        controlsVotingLive.style.display = 'flex';
+
+        arenaTeamAStatus.textContent = 'VOTING LIVE';
+        arenaTeamBStatus.textContent = 'VOTING LIVE';
+        arenaSubstatusText.textContent = 'Audience voting in progress';
+
+        if (battle.ends_at) {
+            startBattleCountdown(battle.ends_at);
+        }
+    } else if (stage === 'voting_ended' || stage === 'finalized') {
+        stageStep1.className = 'stage-step completed';
+        stageStep2.className = 'stage-step completed';
+        stageStep3.className = 'stage-step completed';
+        stageStep4.className = 'stage-step active';
+        controlsJudgement.style.display = 'block';
+
+        judgeInputNameA.textContent = battle.team_a.name;
+        judgeInputNameB.textContent = battle.team_b.name;
+
+        arenaTeamAStatus.textContent = 'VOTING CLOSED';
+        arenaTeamBStatus.textContent = 'VOTING CLOSED';
+        arenaSubstatusText.textContent = 'Enter Judge score to crown winner';
+
+        calculateLiveJudgement();
+    }
+}
+
+async function advanceBattleStage(newStage) {
+    if (!currentRound2Battle) return;
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/round2/battle/stage`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-admin-key': adminKey
+            },
+            body: JSON.stringify({
+                poll_id: currentRound2Battle.id || currentRound2Battle.poll_id,
+                stage: newStage
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to advance stage');
+
+        currentRound2Battle.pitch_stage = newStage;
+        applyRound2BattleUI(currentRound2Battle);
+        if (window.arcadeSound) window.arcadeSound.buttonClick();
+    } catch (e) {
+        showNotice(e.message, true);
+    }
+}
+
+async function handleOpenBattleVoting() {
+    if (!currentRound2Battle) return;
+    const duration = parseInt(selectBattleDuration.value, 10) || 60;
+
+    btnOpenVotingNow.disabled = true;
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/round2/battle/open_voting`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-admin-key': adminKey
+            },
+            body: JSON.stringify({
+                poll_id: currentRound2Battle.id || currentRound2Battle.poll_id,
+                duration_secs: duration
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to open voting');
+
+        showNotice(`🚀 1v1 Audience voting open for ${duration}s!`);
+        if (window.arcadeSound) window.arcadeSound.countdownTick();
+
+        currentRound2Battle.pitch_stage = 'voting_live';
+        currentRound2Battle.is_active = true;
+        currentRound2Battle.ends_at = data.ends_at;
+
+        applyRound2BattleUI(currentRound2Battle);
+    } catch (e) {
+        showNotice(e.message, true);
+    } finally {
+        btnOpenVotingNow.disabled = false;
+    }
+}
+
+async function handleExtendBattleTimer() {
+    btnExtendBattleTimer.disabled = true;
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/poll/extend`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-admin-key': adminKey
+            },
+            body: JSON.stringify({ seconds: 15 })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to extend battle timer');
+
+        showNotice('⏳ 1v1 Battle poll extended by +15s!');
+        if (window.arcadeSound) window.arcadeSound.countdownTick();
+        if (currentRound2Battle) {
+            currentRound2Battle.ends_at = data.ends_at;
+            startBattleCountdown(data.ends_at);
+        }
+    } catch (e) {
+        showNotice(e.message, true);
+    } finally {
+        btnExtendBattleTimer.disabled = false;
+    }
+}
+
+async function handleEndBattleVoting() {
+    btnEndBattleVoting.disabled = true;
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/round2/battle/end`, {
+            method: 'POST',
+            headers: { 'x-admin-key': adminKey }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to end voting');
+
+        showNotice(`🛑 Voting concluded! Total audience votes: ${data.total_votes}`);
+        if (window.arcadeSound) window.arcadeSound.winnerFanfare();
+
+        if (currentRound2Battle) {
+            currentRound2Battle.pitch_stage = 'voting_ended';
+            currentRound2Battle.is_active = false;
+            currentRound2Battle.votes_team_a = data.team_a.votes;
+            currentRound2Battle.votes_team_b = data.team_b.votes;
+            currentRound2Battle.total_votes = data.total_votes;
+            applyRound2BattleUI(currentRound2Battle);
+            updateRound2VoteMeters(data.team_a.votes, data.team_b.votes, data.total_votes);
+        }
+    } catch (e) {
+        showNotice(e.message, true);
+    } finally {
+        btnEndBattleVoting.disabled = false;
+    }
+}
+
+function startBattleCountdown(endsAtIso) {
+    if (r2BattleCountdownInterval) clearInterval(r2BattleCountdownInterval);
+    const target = new Date(endsAtIso).getTime();
+
+    function update() {
+        const now = Date.now();
+        const diff = Math.max(0, target - now);
+        const totalSecs = Math.ceil(diff / 1000);
+
+        const mins = Math.floor(totalSecs / 60);
+        const secs = totalSecs % 60;
+        arenaCountdownTimer.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+        if (diff <= 0) {
+            clearInterval(r2BattleCountdownInterval);
+            r2BattleCountdownInterval = null;
+            arenaCountdownTimer.textContent = '00:00';
+            arenaSubstatusText.textContent = "Time's up! You can extend (+15s) or end voting.";
+        }
+    }
+
+    update();
+    r2BattleCountdownInterval = setInterval(update, 1000);
+}
+
+function updateRound2VoteMeters(votesA = 0, votesB = 0, total = 0) {
+    if (!currentRound2Battle) return;
+
+    currentRound2Battle.votes_team_a = votesA;
+    currentRound2Battle.votes_team_b = votesB;
+    currentRound2Battle.total_votes = total;
+
+    const pctA = total > 0 ? Math.round((votesA / total) * 100) : 50;
+    const pctB = 100 - pctA;
+
+    arenaVotesDisplayA.textContent = `${votesA} VOTES (${pctA}%)`;
+    arenaVotesDisplayB.textContent = `${votesB} VOTES (${pctB}%)`;
+
+    meterFillA.style.width = `${pctA}%`;
+    meterFillA.textContent = `${currentRound2Battle.team_a.name}: ${votesA} (${pctA}%)`;
+
+    meterFillB.style.width = `${pctB}%`;
+    meterFillB.textContent = `${currentRound2Battle.team_b.name}: ${votesB} (${pctB}%)`;
+
+    calculateLiveJudgement();
+}
+
+function calculateLiveJudgement() {
+    if (!currentRound2Battle) return;
+
+    const votesA = currentRound2Battle.votes_team_a || 0;
+    const votesB = currentRound2Battle.votes_team_b || 0;
+    const total = (currentRound2Battle.total_votes !== undefined) ? currentRound2Battle.total_votes : (votesA + votesB);
+
+    const audScoreA = total > 0 ? (votesA / total) * 10 : 0.0;
+    const audScoreB = total > 0 ? (votesB / total) * 10 : 0.0;
+
+    const judgeA = parseFloat(inputJudgeA.value) || 0.0;
+    const judgeB = parseFloat(inputJudgeB.value) || 0.0;
+
+    // 40% Audience Weightage + 60% Judge Weightage
+    const audWeightedA = audScoreA * 0.40;
+    const audWeightedB = audScoreB * 0.40;
+
+    const judgeWeightedA = judgeA * 0.60;
+    const judgeWeightedB = judgeB * 0.60;
+
+    const finalA = (audWeightedA + judgeWeightedA).toFixed(2);
+    const finalB = (audWeightedB + judgeWeightedB).toFixed(2);
+
+    calcAudScoreA.textContent = `${audScoreA.toFixed(2)} / 10`;
+    calcAudScoreB.textContent = `${audScoreB.toFixed(2)} / 10`;
+
+    weightAudA.textContent = audWeightedA.toFixed(2);
+    weightAudB.textContent = audWeightedB.toFixed(2);
+
+    calcFinalA.textContent = `FINAL SCORE: ${finalA} / 10`;
+    calcFinalB.textContent = `FINAL SCORE: ${finalB} / 10`;
+}
+
+async function handleDeclareWinner() {
+    if (!currentRound2Battle) return;
+
+    const judgeA = parseFloat(inputJudgeA.value);
+    const judgeB = parseFloat(inputJudgeB.value);
+
+    if (isNaN(judgeA) || isNaN(judgeB) || judgeA < 0 || judgeA > 10 || judgeB < 0 || judgeB > 10) {
+        showNotice("Please enter valid Judge's scores between 0 and 10 for both teams.", true);
+        return;
+    }
+
+    btnDeclareWinner.disabled = true;
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/round2/battle/finalize`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-admin-key': adminKey
+            },
+            body: JSON.stringify({
+                poll_id: currentRound2Battle.id || currentRound2Battle.poll_id,
+                judge_score_a: judgeA,
+                judge_score_b: judgeB
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to finalize battle');
+
+        showNotice(`👑 1v1 Battle Winner: ${data.winner.name}!`);
+        if (window.arcadeSound) window.arcadeSound.winnerFanfare();
+
+        // Display winner spotlight
+        arenaWinnerSpotlight.style.display = 'block';
+        winnerTeamBanner.textContent = data.winner.name;
+        winnerScoreSummary.textContent = `${data.team_a.name} (${data.team_a.final_score}) vs ${data.team_b.name} (${data.team_b.final_score})`;
+        arenaWinnerSpotlight.scrollIntoView({ behavior: 'smooth' });
+    } catch (e) {
+        showNotice(e.message, true);
+    } finally {
+        btnDeclareWinner.disabled = false;
+    }
+}
+
+function resetBattleArena() {
+    currentRound2Battle = null;
+    arenaWinnerSpotlight.style.display = 'none';
+    selectTeamA.value = '';
+    selectTeamB.value = '';
+    updateMatchmakerPreviews();
+    applyRound2BattleUI({
+        team_a: { name: 'SELECT TEAM A' },
+        team_b: { name: 'SELECT TEAM B' },
+        pitch_stage: 'pitch1'
+    });
+    arenaLiveStatusBadge.textContent = 'READY FOR NEXT BATTLE';
+}
+
+async function syncCurrentRound2Battle() {
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/round2/battle/current`, {
+            headers: { 'x-admin-key': adminKey }
+        });
+        const data = await res.json();
+        if (data.battle) {
+            currentRound2Battle = data.battle;
+            applyRound2BattleUI(data.battle);
+            updateRound2VoteMeters(data.battle.votes_team_a, data.battle.votes_team_b, data.battle.total_votes);
+        }
+    } catch (e) {}
+}
+
+// Background Canvas Animation (High-energy Synthwave Grid & Lightning)
+function initBattleCanvas() {
+    if (!battleArenaCanvas) return;
+    const canvas = battleArenaCanvas;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let width = canvas.width = canvas.parentElement.offsetWidth || 800;
+    let height = canvas.height = canvas.parentElement.offsetHeight || 400;
+
+    window.addEventListener('resize', () => {
+        if (canvas.parentElement) {
+            width = canvas.width = canvas.parentElement.offsetWidth || 800;
+            height = canvas.height = canvas.parentElement.offsetHeight || 400;
+        }
+    });
+
+    let gridOffset = 0;
+    const sparks = [];
+
+    for (let i = 0; i < 40; i++) {
+        sparks.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2,
+            size: Math.random() * 2.5 + 1,
+            color: Math.random() > 0.5 ? '#00e5ff' : '#ff0055'
+        });
+    }
+
+    function render() {
+        ctx.fillStyle = '#020308';
+        ctx.fillRect(0, 0, width, height);
+
+        // Perspective Synthwave Grid Horizon
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.18)';
+        ctx.lineWidth = 1;
+
+        const horizonY = height * 0.45;
+        const numLines = 14;
+
+        // Vertical converging lines
+        for (let i = -numLines; i <= numLines; i++) {
+            const xBottom = width / 2 + i * 50;
+            ctx.beginPath();
+            ctx.moveTo(width / 2 + i * 8, horizonY);
+            ctx.lineTo(xBottom, height);
+            ctx.stroke();
+        }
+
+        // Horizontal moving lines
+        gridOffset = (gridOffset + 0.8) % 30;
+        for (let y = horizonY; y < height; y += (y - horizonY + 15) * 0.35) {
+            const lineY = y + gridOffset * ((y - horizonY) / height);
+            if (lineY <= height) {
+                ctx.beginPath();
+                ctx.moveTo(0, lineY);
+                ctx.lineTo(width, lineY);
+                ctx.stroke();
+            }
+        }
+
+        // Cyber energy sparks
+        sparks.forEach(s => {
+            s.x += s.vx;
+            s.y += s.vy;
+            if (s.x < 0) s.x = width;
+            if (s.x > width) s.x = 0;
+            if (s.y < 0) s.y = height;
+            if (s.y > height) s.y = 0;
+
+            ctx.fillStyle = s.color;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = s.color;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        });
+
+        // Periodic Electric Lightning Arcs in Center
+        if (Math.random() < 0.15) {
+            ctx.strokeStyle = Math.random() > 0.5 ? '#ffe600' : '#00ff66';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = ctx.strokeStyle;
+            ctx.beginPath();
+            let curX = width / 2 + (Math.random() - 0.5) * 60;
+            let curY = horizonY - 40;
+            ctx.moveTo(curX, curY);
+            for (let j = 0; j < 5; j++) {
+                curX += (Math.random() - 0.5) * 40;
+                curY += 25;
+                ctx.lineTo(curX, curY);
+            }
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        battleCanvasAnimId = requestAnimationFrame(render);
+    }
+
+    if (battleCanvasAnimId) cancelAnimationFrame(battleCanvasAnimId);
+    render();
+}
+
+function copyGeminiPrompt() {
+    if (!geminiVideoPromptText) return;
+    navigator.clipboard.writeText(geminiVideoPromptText.value).then(() => {
+        showNotice('📋 Gemini Video prompt copied to clipboard!');
+        btnCopyGeminiPrompt.textContent = '✅ COPIED!';
+        setTimeout(() => {
+            btnCopyGeminiPrompt.textContent = '📋 COPY PROMPT';
+        }, 2500);
+    }).catch(() => {
+        geminiVideoPromptText.select();
+        document.execCommand('copy');
+        showNotice('📋 Gemini Video prompt copied!');
+    });
+}
+
+function applyBattleVideo() {
+    const url = inputBattleVideoUrl.value.trim();
+    if (!url) return;
+
+    battleBgVideo.src = url;
+    battleBgVideo.style.display = 'block';
+    battleArenaCanvas.style.opacity = '0.35'; // overlay subtle cyber sparks over video
+    battleBgVideo.play().catch(e => {
+        showNotice('Could not autoplay video. Please ensure video path is correct.', true);
+    });
+    showNotice(`🎬 Battle background video applied: ${url}`);
+}
+
+function toggleVideoVsCanvas() {
+    if (battleBgVideo.style.display === 'none') {
+        battleBgVideo.style.display = 'block';
+        battleArenaCanvas.style.opacity = '0.35';
+        battleBgVideo.play().catch(e => {});
+        showNotice('Video background enabled');
+    } else {
+        battleBgVideo.style.display = 'none';
+        battleArenaCanvas.style.opacity = '0.85';
+        showNotice('Procedural canvas background enabled');
+    }
+}
+
 

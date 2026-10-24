@@ -927,3 +927,362 @@ body::before {
     accent-color: var(--neon-green);
     cursor: pointer;
 }
+
+/* =========================================================================
+   ROUND 2 & 1v1 BATTLE STYLES (PROJECTOR & MOBILE)
+   ========================================================================= */
+
+.round2-promotion-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-pixel);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+}
+
+.round2-promotion-badge.valid {
+    background: rgba(0, 255, 102, 0.15);
+    color: var(--neon-green);
+    border: 1px solid var(--neon-green);
+}
+
+.round2-promotion-badge.invalid {
+    background: rgba(255, 0, 85, 0.15);
+    color: var(--neon-pink);
+    border: 1px solid var(--neon-pink);
+}
+
+/* Battle Arena Presentation Screen (Projector Ready) */
+.battle-arena-card {
+    position: relative;
+    background: #020307;
+    border: 2px solid var(--neon-cyan);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: 24px;
+    box-shadow: 0 0 35px rgba(0, 229, 255, 0.25), inset 0 0 40px rgba(0, 0, 0, 0.9);
+}
+
+.battle-bg-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    z-index: 1;
+    pointer-events: none;
+}
+
+#battleBgVideo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.35;
+    filter: contrast(1.2) brightness(0.9);
+}
+
+#battleArenaCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.8;
+}
+
+.battle-arena-content {
+    position: relative;
+    z-index: 2;
+    padding: 24px;
+    background: linear-gradient(180deg, rgba(7, 9, 14, 0.4) 0%, rgba(7, 9, 14, 0.85) 100%);
+}
+
+/* VS Split Grid */
+.battle-vs-grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 20px;
+    align-items: center;
+    margin: 20px 0 28px 0;
+}
+
+@media (max-width: 768px) {
+    .battle-vs-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+}
+
+.fighter-card {
+    background: rgba(15, 19, 28, 0.85);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    text-align: center;
+    position: relative;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(8px);
+}
+
+.fighter-card.team-a {
+    border: 2px solid var(--neon-cyan);
+    box-shadow: 0 0 25px rgba(0, 229, 255, 0.3), inset 0 0 20px rgba(0, 229, 255, 0.1);
+}
+
+.fighter-card.team-b {
+    border: 2px solid var(--neon-pink);
+    box-shadow: 0 0 25px rgba(255, 0, 85, 0.3), inset 0 0 20px rgba(255, 0, 85, 0.1);
+}
+
+.fighter-card.active-pitcher {
+    transform: scale(1.02);
+    animation: pitcherPulse 2s infinite alternate;
+}
+
+@keyframes pitcherPulse {
+    0% { box-shadow: 0 0 20px var(--neon-yellow), inset 0 0 15px rgba(255, 230, 0, 0.3); }
+    100% { box-shadow: 0 0 45px var(--neon-yellow), inset 0 0 30px rgba(255, 230, 0, 0.5); }
+}
+
+.fighter-role-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    font-family: var(--font-pixel);
+    font-size: 9px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+}
+
+.fighter-card.team-a .fighter-role-badge {
+    background: rgba(0, 229, 255, 0.2);
+    color: var(--neon-cyan);
+    border: 1px solid var(--neon-cyan);
+}
+
+.fighter-card.team-b .fighter-role-badge {
+    background: rgba(255, 0, 85, 0.2);
+    color: var(--neon-pink);
+    border: 1px solid var(--neon-pink);
+}
+
+.fighter-team-name {
+    font-family: var(--font-pixel);
+    font-size: 20px;
+    color: #fff;
+    margin-bottom: 8px;
+    word-break: break-word;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+}
+
+.fighter-status-tag {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Epic VS Center Badge */
+.vs-center-emblem {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    position: relative;
+}
+
+.vs-badge-glow {
+    font-family: var(--font-pixel);
+    font-size: 38px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 
+        0 0 10px var(--neon-yellow),
+        0 0 20px var(--neon-yellow),
+        0 0 40px #ff6600,
+        0 0 70px #ff0055;
+    animation: vsPulse 1.4s ease-in-out infinite alternate;
+    letter-spacing: 2px;
+}
+
+@keyframes vsPulse {
+    0% { transform: scale(0.95); filter: drop-shadow(0 0 10px rgba(255, 230, 0, 0.6)); }
+    100% { transform: scale(1.08); filter: drop-shadow(0 0 25px rgba(255, 0, 85, 0.9)); }
+}
+
+/* Battle Stages Breadcrumb Header */
+.battle-stages-bar {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 20px;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+}
+
+.stage-step {
+    flex: 1;
+    text-align: center;
+    padding: 8px 4px;
+    font-family: var(--font-pixel);
+    font-size: 9px;
+    color: var(--text-muted);
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.stage-step.active {
+    color: var(--neon-yellow);
+    border-bottom-color: var(--neon-yellow);
+    background: rgba(255, 230, 0, 0.05);
+}
+
+.stage-step.completed {
+    color: var(--neon-green);
+    border-bottom-color: var(--neon-green);
+}
+
+/* Tug-of-war Vote Bar */
+.battle-vote-meter {
+    background: #000;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    height: 38px;
+    display: flex;
+    position: relative;
+    margin: 16px 0;
+    box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.8);
+}
+
+.meter-fill-a {
+    background: linear-gradient(90deg, #0099ff, var(--neon-cyan));
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding-left: 12px;
+    font-family: var(--font-pixel);
+    font-size: 11px;
+    color: #000;
+    font-weight: 700;
+    transition: width 0.4s ease;
+    min-width: 50px;
+}
+
+.meter-fill-b {
+    background: linear-gradient(90deg, #ff0066, #ff3300);
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 12px;
+    font-family: var(--font-pixel);
+    font-size: 11px;
+    color: #fff;
+    font-weight: 700;
+    transition: width 0.4s ease;
+    min-width: 50px;
+}
+
+/* Audience Mobile 1v1 Duel Buttons */
+.battle-duel-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 16px 0;
+}
+
+.btn-battle-duel {
+    position: relative;
+    padding: 20px 16px;
+    background: #000;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+    box-shadow: 0 6px 0 #000;
+}
+
+.btn-battle-duel.team-a {
+    border: 3px solid var(--neon-cyan);
+}
+
+.btn-battle-duel.team-a:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 #000;
+    background: rgba(0, 229, 255, 0.15);
+}
+
+.btn-battle-duel.team-b {
+    border: 3px solid var(--neon-pink);
+}
+
+.btn-battle-duel.team-b:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 #000;
+    background: rgba(255, 0, 85, 0.15);
+}
+
+.btn-battle-duel .duel-team-name {
+    font-family: var(--font-pixel);
+    font-size: 16px;
+    color: #fff;
+    letter-spacing: 1px;
+}
+
+.btn-battle-duel .duel-prompt {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--font-hud);
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.btn-battle-duel.team-a .duel-prompt {
+    color: var(--neon-cyan);
+}
+
+.btn-battle-duel.team-b .duel-prompt {
+    color: var(--neon-pink);
+}
+
+/* Battling Team Lockout Banner */
+.battling-lockout-card {
+    background: rgba(255, 0, 85, 0.08);
+    border: 2px solid var(--neon-pink);
+    border-radius: var(--radius-md);
+    padding: 24px 16px;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(255, 0, 85, 0.2);
+}
+
+/* Winner Spotlight Card */
+.winner-spotlight {
+    background: linear-gradient(135deg, rgba(255, 230, 0, 0.15), rgba(0, 255, 102, 0.15));
+    border: 3px solid var(--neon-yellow);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    text-align: center;
+    box-shadow: 0 0 40px rgba(255, 230, 0, 0.4);
+    animation: winnerGlow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes winnerGlow {
+    0% { transform: scale(0.99); box-shadow: 0 0 25px rgba(255, 230, 0, 0.3); }
+    100% { transform: scale(1.01); box-shadow: 0 0 55px rgba(255, 230, 0, 0.6); }
+}
+

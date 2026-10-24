@@ -83,6 +83,32 @@
             </div>
         </div>
 
+        <!-- SUBSTATE 2B: ROUND 2 BATTLE SHOWDOWN (PARTICIPATING TEAMS CANNOT VOTE) -->
+        <div id="stateRound2BattlingNotice" class="battling-lockout-card" style="display: none;">
+            <div style="font-size: 40px; margin-bottom: 8px;">⚔️</div>
+            <h2 style="font-family: var(--font-pixel); font-size: 15px; color: var(--neon-pink); line-height: 1.5; margin-bottom: 10px;">
+                YOUR TEAM IS IN A 1v1 BATTLE!
+            </h2>
+            <p style="font-size: 14px; color: #fff; line-height: 1.5; margin-bottom: 10px;">
+                You are currently in the arena! Both competing teams are locked out from voting. Give an epic performance on stage!
+            </p>
+            <div style="font-size: 11px; color: var(--text-muted);">
+                (Audience will decide the head-to-head vote)
+            </div>
+        </div>
+
+        <!-- SUBSTATE 2C: ROUND 2 WATCHING PITCHES (BEFORE VOTING OPENS) -->
+        <div id="stateRound2Watching" class="waiting-card" style="display: none;">
+            <div style="font-size: 36px; margin-bottom: 6px;">⚔️</div>
+            <div style="font-family: var(--font-pixel); font-size: 10px; color: var(--neon-pink); margin-bottom: 8px;">
+                1v1 PITCH BATTLE IN PROGRESS
+            </div>
+            <h2 class="waiting-title" id="r2WatchTitle">TEAM IS PITCHING NOW...</h2>
+            <p class="waiting-sub" id="r2WatchSub">
+                Listen carefully! Once both teams have pitched, head-to-head voting will unlock on your screen.
+            </p>
+        </div>
+
         <!-- SUBSTATE 3: ACTIVE VOTING POLL (ROUND 1 SCORE 1-10) -->
         <div id="stateVoting" class="voting-screen" style="display: none;">
             
@@ -121,6 +147,46 @@
             </button>
             <div style="text-align: center; font-size: 11px; color: var(--text-muted);">
                 ⚠️ Only 1 member per team can vote. Choose wisely!
+            </div>
+        </div>
+
+        <!-- SUBSTATE 3B: ROUND 2 1v1 HEAD-TO-HEAD DUEL VOTING -->
+        <div id="stateRound2Voting" class="voting-screen" style="display: none;">
+            
+            <!-- Digital Timer HUD -->
+            <div class="timer-card">
+                <div class="timer-label" style="color: var(--neon-pink);">1v1 BATTLE VOTING CLOSES IN</div>
+                <div id="r2PollCountdown" class="timer-digits">00:60</div>
+            </div>
+
+            <div style="text-align: center; margin: 12px 0 6px 0;">
+                <div style="font-family: var(--font-pixel); font-size: 11px; color: var(--neon-yellow);">
+                    WHICH PITCH WAS BETTER?
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                    Select the winning team below (1 vote per team)
+                </div>
+            </div>
+
+            <!-- Head-to-Head Duel Choice Buttons -->
+            <div class="battle-duel-container">
+                <button type="button" id="btnVoteTeamA" class="btn-battle-duel team-a">
+                    <span class="duel-prompt">🟦 VOTE FOR</span>
+                    <span class="duel-team-name" id="duelNameA">TEAM A</span>
+                </button>
+
+                <div style="text-align: center; font-family: var(--font-pixel); font-size: 14px; color: var(--neon-yellow);">
+                    — OR —
+                </div>
+
+                <button type="button" id="btnVoteTeamB" class="btn-battle-duel team-b">
+                    <span class="duel-prompt">🟥 VOTE FOR</span>
+                    <span class="duel-team-name" id="duelNameB">TEAM B</span>
+                </button>
+            </div>
+
+            <div style="text-align: center; font-size: 11px; color: var(--text-muted); margin-top: 10px;">
+                ⚠️ Only 1 member per team can vote. One tap locks in your team's decision!
             </div>
         </div>
 

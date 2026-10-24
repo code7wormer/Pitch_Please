@@ -11,7 +11,8 @@ from database import get_db
 from models import Team, Round, Poll, Vote, utc_now, ensure_utc
 from schemas import (
     TeamCreate, TeamResponse, TeamToggleActive,
-    StartPollRequest, ExtendPollRequest, PollResponse, PollResult, SetPitchingRequest
+    StartPollRequest, ExtendPollRequest, PollResponse, PollResult, SetPitchingRequest,
+    PromoteTeamsRequest, StartBattleRequest, AdvanceStageRequest, OpenVotingRequest, FinalizeBattleRequest
 )
 from services.poll_manager import manager
 
@@ -72,6 +73,7 @@ async def list_teams(
             code=t.code,
             is_active=t.is_active,
             has_pitched=(t.id in pitched_ids),
+            is_promoted_round_2=getattr(t, 'is_promoted_round_2', False) or False,
             created_at=t.created_at
         ))
     return output
@@ -341,3 +343,328 @@ async def delete_poll(
     await db.commit()
     await manager.broadcast_to_admin({"event": "results_updated"})
     return {"success": True, "message": f"Poll {poll_id} and all associated votes deleted"}
+
+
+# =========================================================================
+# ROUND 2: PROMOTION & 1v1 BATTLE ENDPOINTS
+# =========================================================================
+
+@router.get("/round2/teams")
+async def get_round2_teams(
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin)
+):
+    result = await db.execute(select(Team).where(Team.is_active == True).order_by(Team.name.asc()))
+    teams = result.scalars().all()
+    
+    # Calculate Round 1 averages for context
+    poll_res = await db.execute(
+        select(Poll).options(selectinload(Poll.votes)).where(Poll.round_number == 1)
+    )
+    r1_polls = poll_res.scalars().all()
+    team_averages = {}
+    for p in r1_polls:
+        scores = [v.score for v in p.votes if v.score is not None]
+        if scores:
+            team_averages[p.pitching_team_id] = round(sum(scores) / len(scores), 2)
+
+    return [
+        {
+            "id": t.id,
+            "name": t.name,
+            "code": t.code,
+            "is_promoted": bool(getattr(t, "is_promoted_round_2", False)),
+            "round1_avg": team_averages.get(t.id, 0.0)
+        }
+        for t in teams
+    ]
+
+@router.post("/round2/promote")
+async def promote_round2_teams(
+    payload: PromoteTeamsRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin)
+):
+    team_count = len(payload.team_ids)
+    if team_count < 2 or team_count % 2 != 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"An even number of teams is strictly required for 1v1 battles (Selected: {team_count}). Please select 2, 4, 6, 8... teams."
+        )
+
+    # Reset all teams and promote chosen ones
+    all_teams_res = await db.execute(select(Team))
+    for t in all_teams_res.scalars().all():
+        t.is_promoted_round_2 = (t.id in payload.team_ids)
+    
+    await db.commit()
+    await manager.broadcast_to_admin({"event": "round2_promoted_updated", "count": team_count})
+    return {"success": True, "promoted_count": team_count, "promoted_ids": payload.team_ids}
+
+@router.post("/round2/battle/start")
+async def start_round2_battle(
+    payload: StartBattleRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin)
+):
+    if payload.team_a_id == payload.team_b_id:
+        raise HTTPException(status_code=400, detail="Cannot select the same team to battle against itself!")
+
+    team_a = await db.get(Team, payload.team_a_id)
+    team_b = await db.get(Team, payload.team_b_id)
+    if not team_a or not team_b:
+        raise HTTPException(status_code=404, detail="One or both selected teams do not exist")
+
+    # Get or create Round 2
+    round_result = await db.execute(select(Round).where(Round.name == "Round 2"))
+    round_2 = round_result.scalars().first()
+    if not round_2:
+        round_2 = Round(name="Round 2", max_score=10, is_current=True)
+        db.add(round_2)
+        await db.commit()
+        await db.refresh(round_2)
+
+    # Deactivate existing active polls
+    active_polls = await db.execute(select(Poll).where(Poll.is_active == True))
+    for p in active_polls.scalars().all():
+        p.is_active = False
+        p.ends_at = utc_now()
+
+    now = utc_now()
+    first_pitcher = payload.first_pitcher_id or payload.team_a_id
+
+    # Create 1v1 battle poll (voting inactive until both pitches complete!)
+    poll = Poll(
+        round_id=round_2.id,
+        round_number=2,
+        pitching_team_id=payload.team_a_id,
+        pitching_team_b_id=payload.team_b_id,
+        first_pitcher_id=first_pitcher,
+        pitch_stage="pitch1",
+        duration_secs=60,
+        started_at=now,
+        ends_at=now,
+        is_active=False
+    )
+    db.add(poll)
+    await db.commit()
+    await db.refresh(poll)
+
+    battle_payload = {
+        "event": "round2_battle_locked",
+        "poll_id": poll.id,
+        "team_a": {"id": team_a.id, "name": team_a.name, "code": team_a.code},
+        "team_b": {"id": team_b.id, "name": team_b.name, "code": team_b.code},
+        "first_pitcher_id": first_pitcher,
+        "first_pitcher_name": team_a.name if first_pitcher == team_a.id else team_b.name,
+        "pitch_stage": "pitch1"
+    }
+    await manager.broadcast_all(battle_payload)
+    return battle_payload
+
+@router.post("/round2/battle/stage")
+async def advance_round2_stage(
+    payload: AdvanceStageRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin)
+):
+    poll = await db.get(Poll, payload.poll_id)
+    if not poll:
+        raise HTTPException(status_code=404, detail="Battle poll not found")
+
+    poll.pitch_stage = payload.stage
+    await db.commit()
+
+    stage_event = {
+        "event": "round2_stage_updated",
+        "poll_id": poll.id,
+        "stage": payload.stage
+    }
+    await manager.broadcast_all(stage_event)
+    return stage_event
+
+@router.post("/round2/battle/open_voting")
+async def open_round2_voting(
+    payload: OpenVotingRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin)
+):
+    result = await db.execute(
+        select(Poll)
+        .options(selectinload(Poll.pitching_team), selectinload(Poll.pitching_team_b))
+        .where(Poll.id == payload.poll_id)
+    )
+    poll = result.scalars().first()
+    if not poll:
+        raise HTTPException(status_code=404, detail="Battle poll not found")
+
+    now = utc_now()
+    ends_at = now + timedelta(seconds=payload.duration_secs)
+    poll.is_active = True
+    poll.duration_secs = payload.duration_secs
+    poll.started_at = now
+    poll.ends_at = ends_at
+    poll.pitch_stage = "voting_live"
+    await db.commit()
+
+    event_data = {
+        "event": "poll_started",
+        "round_number": 2,
+        "poll_id": poll.id,
+        "team_a": {"id": poll.pitching_team.id, "name": poll.pitching_team.name},
+        "team_b": {"id": poll.pitching_team_b.id, "name": poll.pitching_team_b.name},
+        "duration_secs": poll.duration_secs,
+        "started_at": poll.started_at.isoformat(),
+        "ends_at": poll.ends_at.isoformat(),
+        "pitch_stage": "voting_live"
+    }
+    await manager.broadcast_all(event_data)
+    return event_data
+
+@router.post("/round2/battle/end")
+async def end_round2_voting(
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin)
+):
+    result = await db.execute(
+        select(Poll)
+        .options(selectinload(Poll.pitching_team), selectinload(Poll.pitching_team_b), selectinload(Poll.votes))
+        .where(Poll.is_active == True, Poll.round_number == 2)
+    )
+    poll = result.scalars().first()
+    if not poll:
+        # Fallback to latest round 2 poll
+        res2 = await db.execute(
+            select(Poll)
+            .options(selectinload(Poll.pitching_team), selectinload(Poll.pitching_team_b), selectinload(Poll.votes))
+            .where(Poll.round_number == 2)
+            .order_by(Poll.created_at.desc())
+        )
+        poll = res2.scalars().first()
+        if not poll:
+            raise HTTPException(status_code=400, detail="No active Round 2 battle found to end")
+
+    poll.is_active = False
+    poll.pitch_stage = "voting_ended"
+    poll.ends_at = utc_now()
+    await db.commit()
+
+    votes_a = sum(1 for v in poll.votes if v.voted_for_team_id == poll.pitching_team_id)
+    votes_b = sum(1 for v in poll.votes if v.voted_for_team_id == poll.pitching_team_b_id)
+    total = len(poll.votes)
+
+    data = {
+        "event": "round2_voting_ended",
+        "poll_id": poll.id,
+        "team_a": {"id": poll.pitching_team.id, "name": poll.pitching_team.name, "votes": votes_a},
+        "team_b": {"id": poll.pitching_team_b.id, "name": poll.pitching_team_b.name, "votes": votes_b},
+        "total_votes": total
+    }
+    await manager.broadcast_all(data)
+    return data
+
+@router.post("/round2/battle/finalize")
+async def finalize_round2_battle(
+    payload: FinalizeBattleRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin)
+):
+    result = await db.execute(
+        select(Poll)
+        .options(selectinload(Poll.pitching_team), selectinload(Poll.pitching_team_b), selectinload(Poll.votes))
+        .where(Poll.id == payload.poll_id)
+    )
+    poll = result.scalars().first()
+    if not poll:
+        raise HTTPException(status_code=404, detail="Battle poll not found")
+
+    poll.is_active = False
+    poll.pitch_stage = "finalized"
+    await db.commit()
+
+    votes_a = sum(1 for v in poll.votes if v.voted_for_team_id == poll.pitching_team_id)
+    votes_b = sum(1 for v in poll.votes if v.voted_for_team_id == poll.pitching_team_b_id)
+    total_votes = len(poll.votes)
+
+    # 40% Audience Weightage (percentage of votes out of 10)
+    aud_score_a = round((votes_a / total_votes) * 10, 2) if total_votes > 0 else 0.0
+    aud_score_b = round((votes_b / total_votes) * 10, 2) if total_votes > 0 else 0.0
+
+    # 60% Judge Weightage (judge score 0 to 10)
+    judge_a = max(0.0, min(10.0, float(payload.judge_score_a)))
+    judge_b = max(0.0, min(10.0, float(payload.judge_score_b)))
+
+    final_score_a = round((aud_score_a * 0.40) + (judge_a * 0.60), 2)
+    final_score_b = round((aud_score_b * 0.40) + (judge_b * 0.60), 2)
+
+    winner_team = None
+    if final_score_a > final_score_b:
+        winner_team = {"id": poll.pitching_team.id, "name": poll.pitching_team.name}
+    elif final_score_b > final_score_a:
+        winner_team = {"id": poll.pitching_team_b.id, "name": poll.pitching_team_b.name}
+    else:
+        winner_team = {"id": 0, "name": "TIE"}
+
+    result_payload = {
+        "event": "round2_winner_declared",
+        "poll_id": poll.id,
+        "team_a": {
+            "id": poll.pitching_team.id,
+            "name": poll.pitching_team.name,
+            "votes": votes_a,
+            "audience_score": aud_score_a,
+            "judge_score": judge_a,
+            "final_score": final_score_a
+        },
+        "team_b": {
+            "id": poll.pitching_team_b.id,
+            "name": poll.pitching_team_b.name,
+            "votes": votes_b,
+            "audience_score": aud_score_b,
+            "judge_score": judge_b,
+            "final_score": final_score_b
+        },
+        "total_audience_votes": total_votes,
+        "winner": winner_team
+    }
+    await manager.broadcast_all(result_payload)
+    return result_payload
+
+@router.get("/round2/battle/current")
+async def get_current_round2_battle(
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin)
+):
+    result = await db.execute(
+        select(Poll)
+        .options(selectinload(Poll.pitching_team), selectinload(Poll.pitching_team_b), selectinload(Poll.votes))
+        .where(Poll.round_number == 2)
+        .order_by(Poll.created_at.desc())
+    )
+    poll = result.scalars().first()
+    if not poll:
+        return {"active": False, "battle": None}
+
+    now = utc_now()
+    ends_at_utc = ensure_utc(poll.ends_at)
+    remaining = max(0.0, (ends_at_utc - now).total_seconds())
+
+    votes_a = sum(1 for v in poll.votes if v.voted_for_team_id == poll.pitching_team_id)
+    votes_b = sum(1 for v in poll.votes if v.voted_for_team_id == poll.pitching_team_b_id)
+
+    return {
+        "active": poll.is_active,
+        "battle": {
+            "id": poll.id,
+            "pitch_stage": poll.pitch_stage,
+            "team_a": {"id": poll.pitching_team.id, "name": poll.pitching_team.name},
+            "team_b": {"id": poll.pitching_team_b.id, "name": poll.pitching_team_b.name},
+            "first_pitcher_id": poll.first_pitcher_id,
+            "is_active": poll.is_active,
+            "duration_secs": poll.duration_secs,
+            "remaining_secs": round(remaining, 1),
+            "votes_team_a": votes_a,
+            "votes_team_b": votes_b,
+            "total_votes": len(poll.votes)
+        }
+    }

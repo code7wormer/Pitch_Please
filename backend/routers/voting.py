@@ -26,7 +26,12 @@ async def get_current_poll(
 ):
     result = await db.execute(
         select(Poll)
-        .options(selectinload(Poll.pitching_team), selectinload(Poll.votes))
+        .options(
+            selectinload(Poll.pitching_team),
+            selectinload(Poll.pitching_team_b),
+            selectinload(Poll.first_pitcher),
+            selectinload(Poll.votes)
+        )
         .where(Poll.is_active == True)
     )
     poll = result.scalars().first()
@@ -44,7 +49,9 @@ async def get_current_poll(
         team_res = await db.execute(select(Team).where(Team.code == x_team_code.strip()))
         team = team_res.scalars().first()
         if team:
-            if team.id == poll.pitching_team_id:
+            # In Round 1: pitching_team_id is locked out
+            # In Round 2: BOTH pitching_team_id and pitching_team_b_id are locked out
+            if team.id == poll.pitching_team_id or (poll.pitching_team_b_id and team.id == poll.pitching_team_b_id):
                 is_pitching = True
             
             # Check if this team has already voted
@@ -59,8 +66,13 @@ async def get_current_poll(
         "poll": {
             "id": poll.id,
             "round_id": poll.round_id,
+            "round_number": poll.round_number,
             "pitching_team_id": poll.pitching_team_id,
             "pitching_team_name": poll.pitching_team.name if poll.pitching_team else "Unknown",
+            "pitching_team_b_id": poll.pitching_team_b_id,
+            "pitching_team_b_name": poll.pitching_team_b.name if poll.pitching_team_b else None,
+            "first_pitcher_id": poll.first_pitcher_id,
+            "pitch_stage": poll.pitch_stage,
             "duration_secs": poll.duration_secs,
             "started_at": poll.started_at.isoformat(),
             "ends_at": poll.ends_at.isoformat(),
@@ -104,19 +116,33 @@ async def submit_vote(
             detail="Voting time is up! If the organizer extends the poll (+15s), you can submit then."
         )
 
-    # 4. Check if team is pitching team
-    if team.id == poll.pitching_team_id:
+    # 4. Check if team is participating pitcher (LOCK OUT BOTH TEAMS IN 1V1 BATTLE)
+    if team.id == poll.pitching_team_id or (poll.pitching_team_b_id and team.id == poll.pitching_team_b_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your team is currently pitching and cannot vote on your own pitch!"
+            detail="Your team is currently battling on stage and cannot participate in the vote!"
         )
 
-    # 5. STRICT ENFORCEMENT: ONLY ONE MEMBER PER TEAM MAY VOTE
+    # 5. Validate vote payload according to round
+    is_round_2 = (poll.round_number == 2 or poll.pitching_team_b_id is not None)
+    if is_round_2:
+        if not payload.voted_for_team_id or payload.voted_for_team_id not in (poll.pitching_team_id, poll.pitching_team_b_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="In Round 2, you must select one of the two competing teams."
+            )
+    else:
+        if payload.score is None or payload.score < 1 or payload.score > 10:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="In Round 1, score must be between 1 and 10."
+            )
+
+    # 6. STRICT ENFORCEMENT: ONLY ONE MEMBER PER TEAM MAY VOTE
     existing_vote = await db.execute(
         select(Vote).where(Vote.poll_id == poll.id, Vote.voter_team_id == team.id)
     )
     if existing_vote.scalars().first():
-        # Notify team device in real-time
         await manager.send_to_team(team.code, {
             "event": "already_voted",
             "poll_id": poll.id,
@@ -127,11 +153,12 @@ async def submit_vote(
             detail="A vote has already been submitted by a member of your team. Only one vote per team is allowed."
         )
 
-    # 6. Insert vote (protected additionally by DB UNIQUE constraint)
+    # 7. Insert vote (protected additionally by DB UNIQUE constraint)
     new_vote = Vote(
         poll_id=poll.id,
         voter_team_id=team.id,
-        score=payload.score
+        score=payload.score if not is_round_2 else 1,
+        voted_for_team_id=payload.voted_for_team_id if is_round_2 else None
     )
     db.add(new_vote)
     try:
@@ -144,18 +171,23 @@ async def submit_vote(
             detail="A vote from your team was just recorded simultaneously. Only one vote per team is permitted."
         )
 
-    # 7. Count total votes for live admin dashboard
-    vote_count_res = await db.execute(
-        select(func.count(Vote.id)).where(Vote.poll_id == poll.id)
+    # 8. Count total votes and duel breakdown for live admin dashboard
+    votes_res = await db.execute(
+        select(Vote).where(Vote.poll_id == poll.id)
     )
-    total_votes = vote_count_res.scalar_one()
+    all_votes = votes_res.scalars().all()
+    total_votes = len(all_votes)
 
-    # 8. Real-time updates:
-    # A) Inform all devices logged in with this team code that their team has voted
+    votes_team_a = sum(1 for v in all_votes if v.voted_for_team_id == poll.pitching_team_id)
+    votes_team_b = sum(1 for v in all_votes if v.voted_for_team_id == poll.pitching_team_b_id)
+
+    # 9. Real-time updates:
+    # A) Inform voter's team devices
     await manager.send_to_team(team.code, {
         "event": "vote_confirmed",
         "poll_id": poll.id,
         "score": payload.score,
+        "voted_for_team_id": payload.voted_for_team_id,
         "message": "Your team's vote has been officially locked in!"
     })
 
@@ -164,6 +196,8 @@ async def submit_vote(
         "event": "vote_cast",
         "poll_id": poll.id,
         "total_votes": total_votes,
+        "votes_team_a": votes_team_a,
+        "votes_team_b": votes_team_b,
         "latest_voter_team": team.name
     })
 
@@ -171,5 +205,6 @@ async def submit_vote(
         success=True,
         message="Vote cast successfully!",
         poll_id=poll.id,
-        score=payload.score
+        score=payload.score,
+        voted_for_team_id=payload.voted_for_team_id
     )
